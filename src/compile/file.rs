@@ -36,7 +36,7 @@
 //!
 //! 文件路径 → 组件 ID：`cui/tools/read_file.cui` → `tools/read_file`
 //!
-//! 加载时自动注入内置的 `_cui_help` 自描述组件，无需手动创建。
+//! 加载时自动注入内置的 `_cui_introduction` 介绍组件，无需手动创建。
 
 mod component;
 mod directory;

@@ -1,0 +1,44 @@
+---
+id: _cui_introduction
+title: CUI 框架参考
+priority: critical
+inert: true
+static: true
+summary: CUI v0.1 — 组件化上下文 UI，AI 通过 `component_action` 工具交互
+actions:
+  - {id: expand, label: 展开完整参考, target: detailed}
+  - {id: collapse, label: 折叠, target: summary, show: '>summary'}
+---
+
+## 输出格式
+```
+## [id] title level [priority] ~ body [action1|action2]
+  body 续行（缩进 2 空格）
+```
+| 标记 | 含义 |
+|--|--|
+| `[id]` | 组件标识 |
+| `level` | 渲染级别：`hidden`/`title`/`summary`/`normal`/`detailed` |
+| `[priority]` | 仅非 normal 出现：`critical`/`high`/`low`/`minimal` |
+| `~` | header/body 分隔 |
+| `[action1\|action2]` | 可交互动作，超 3 个截断为 `[+N more]` |
+| `[+N more]` | 动作列表截断，调用 `component_action` 展开 |
+| `● [id]` | dirty 标记：有未消费变更 |
+
+## 示例
+```
+## [env] 环境变量 normal ~ 分支: main | 提交: abc123 [expand|refresh]
+## [file_tree] 文件树 summary ~ src/
+  src/main.rs
+  src/lib.rs
+## [_overview]
+    [metrics] [expand:metrics]
+    [results]
+## [_recent]
+  ·[env] expand → detailed ✓
+  ·[file_tree] refresh ✓
+```
+
+- `## [_overview]` — 隐藏组件总览区
+- `## [_recent]` — 近期操作日志
+- AI 通过 `component_action` 的 `action`/`params` 参数与组件交互

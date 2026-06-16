@@ -26,13 +26,47 @@ use crate::runtime::handler::{ActionHandler, HandlerRegistry};
 /// 通过 [`Cui::init()`] 获取实例，链式调用装配组件，最后 [`build()`](Self::build) 产出 [`Context`]。
 pub struct CuiBuilder {
     ctx: Context,
+    include_intro: bool,
 }
 
 impl CuiBuilder {
     pub fn new() -> Self {
-        Self {
+        let mut builder = Self {
             ctx: Context::new(),
+            include_intro: true,
+        };
+        builder.inject_introduction();
+        builder
+    }
+
+    /// 跳过自动注入的介绍组件（`_cui_introduction`）。
+    ///
+    /// 默认情况下，`Cui::init()` 会注册内置的 CUI 框架参考文档，
+    /// 调用此方法可移除已注入的介绍组件并阻止后续注入。
+    pub fn without_introduction(mut self) -> Self {
+        self.ctx.remove("_cui_introduction");
+        self.include_intro = false;
+        self
+    }
+
+    fn inject_introduction(&mut self) {
+        if !self.include_intro {
+            return;
         }
+        const INTRO_CONTENT: &str = include_str!("../../cui/_cui_introduction.cui");
+        let comp = match CuiFileComponent::from_str(INTRO_CONTENT, "_cui_introduction") {
+            Ok(c) => c,
+            Err(e) => {
+                tracing::warn!("内置 _cui_introduction.cui 解析失败: {e}");
+                return;
+            }
+        };
+        let content = comp.body().to_string();
+        let id = comp.id().to_string();
+        let title = comp.title().to_string();
+        let mut tb = TextBlock::new(&id, &title, &content);
+        tb = Self::apply_frontmatter(tb, &comp);
+        self.ctx.register(tb.build());
     }
 
     /// 从 `.cui` 文件加载，返回 (body, component) 对。
