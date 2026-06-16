@@ -1,0 +1,160 @@
+//! CUI（Context UI）—— 基于 BaseComponent 的上下文 UI 框架。
+//!
+//! 借鉴 Dioxus 组件模型，将组件渲染改造为
+//! 声明式、可交互的组件树。核心概念：
+//!
+//! - **BaseComponent** — 核心组件接口，有 id/title/priority/actions
+//! - **RenderLevel** — 控制组件在不同容量压力下的展示粒度
+//! - **CapacityPlanner** — 迭代降级/升级算法，按优先级分配预算
+//! - **ComponentTree/ComponentNode** — 树形组件管理
+//! - **TypeRegistry** — 语义类型注册表，声明 `type: tool` 自动提供默认行为
+//!
+//! 输出格式：YAML frontmatter + Markdown body，AI 通过 `component_action`
+//! 工具与组件交互（展开、折叠、滚动等）。
+//!
+//! # 模块组织
+//!
+//! - [`types`] — 基础类型（RenderLevel、DataMode、Action 等）
+//! - [`component`] — BaseComponent/ComponentTree/ComponentNode 体系
+//! - [`render`] — 渲染管线（容量规划、状态机）
+//! - [`context`] — 运行时上下文管理器
+//! - [`compile`] — 编译管道：.cui 源码 → 模板填充 → 组件树
+//! - [`content`] — 内容加载：内置资源、提示词、系统指令
+//! - [`runtime`] — 运行时服务（事件、处理器、类型注册表、对话管理）
+//! - [`adapter`] — .cui 模板 → 组件节点的轻量适配
+
+// ── 基础类型 ──────────────────────────────────────────
+
+pub mod types;
+pub use types::{action, condition, data, keyword, level, manage, output, tokenizer};
+
+// ── 组件模型 ────────────────────────────────────────
+
+pub mod component;
+pub use component::builtin::{
+    Body, Button, DataSlot, GroupBuilder, Label, Toast, body, button, data_slot, group, label,
+    text_block, toast,
+};
+pub use component::{
+    BaseComponent, ComponentLifecycle, ComponentNode, ComponentTree, CuiBuilder, Persistable,
+    builtin,
+};
+
+// ── 渲染管线 ────────────────────────────────────────
+
+pub mod render;
+
+// ── 运行时上下文管理器 ──────────────────────────────
+
+pub mod context;
+pub use context::Context;
+
+// ── 语法高亮 ────────────────────────────────────────
+
+pub mod syntax;
+
+// ── 运行时服务 ──────────────────────────────────────
+
+pub mod runtime;
+pub use runtime::registry::{
+    ComponentTypeDef, ResolvedComponent, SlotDecl, TypeRegistry, builtin_registry,
+};
+pub use runtime::{capacity, dialogue, event, handler, ordering};
+
+// ── 编译管道 ────────────────────────────────────────
+
+pub mod compile;
+pub use compile::compiler::{Compiler, CompilerError, build_tree_nodes};
+pub use compile::file::{CuiDirectory, CuiFileComponent, parse_frontmatter_body, parse_multi_cui};
+pub use compile::template::{ReadMode, TemplateEngine, TemplateNode, TemplateResolver};
+
+// ── 内容加载 ────────────────────────────────────────
+
+pub mod content;
+pub use content::bundled;
+
+#[cfg(feature = "instructions")]
+pub use content::instructions;
+#[cfg(feature = "instructions")]
+pub use content::instructions::{
+    resolve_nearby_instructions, system_paths, system_prompt, system_prompt_and_sources,
+    system_prompt_and_sources_with_cache,
+};
+#[cfg(feature = "prompts")]
+pub use content::prompt;
+
+// ── 适配器 ──────────────────────────────────────────
+
+pub mod adapter;
+
+// ── 类型级 re-export ─────────────────────────────────
+
+pub use action::{
+    ActionDef, ActionRequest, ActionResult, ActionVariant, DialogueOps, VisibilityRule,
+};
+pub use compile::file as cui_file;
+pub use condition::VisibilityCondition;
+pub use data::DataMode;
+pub use handler::{ActionContext, ActionHandler, ActionHandlerRef, ActionOutput, HandlerRegistry};
+pub use keyword::{ComponentKind, IoDef, IoType, PriorityLevel};
+pub use level::RenderLevel;
+pub use manage::ManageEvent;
+pub use ordering::OrderingStrategy;
+
+// ── 测试工具模块（仅在 test 下编译） ───────────────
+
+#[cfg(any(test, feature = "test-utils"))]
+pub use runtime::test_utils;
+
+// ── CUI 格式化 ──────────────────────────────────────
+
+/// 将键值对和正文格式化为 CUI 块（YAML frontmatter + body）。
+///
+/// 输出格式：
+/// ```text
+/// ---
+/// key1: value1
+/// key2: value2
+/// ---
+/// body
+/// ```
+///
+/// 若 fields 为空，仅返回 body（无 frontmatter）。
+pub fn format_cui_block(fields: &[(&str, &str)], body: &str) -> String {
+    if fields.is_empty() {
+        return body.to_string();
+    }
+    let mut out = String::from("---\n");
+    for (k, v) in fields {
+        out.push_str(k);
+        out.push_str(": ");
+        out.push_str(v);
+        out.push('\n');
+    }
+    out.push_str("---\n");
+    out.push_str(body);
+    out
+}
+
+// ── 宏导出 ──────────────────────────────────────────
+
+pub use cui_derive::{ActionHandler, BaseComponent};
+
+// ── 框架入口 ────────────────────────────────────────
+
+/// CUI 框架入口。
+///
+/// ```ignore
+/// use cui::Cui;
+/// let ctx = Cui::init()
+///     .section("essential/goals.cui")
+///     .build();
+/// ```
+pub struct Cui;
+
+impl Cui {
+    /// 创建 [`CuiBuilder`]，开始声明式组装 Context。
+    pub fn init() -> CuiBuilder {
+        CuiBuilder::new()
+    }
+}

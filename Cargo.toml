@@ -1,0 +1,60 @@
+[workspace]
+members = [
+    "crates/cui-derive",
+    "crates/state-macro",
+]
+resolver = "2"
+
+[workspace.dependencies]
+anyhow = "1.0.102"
+dirs = "6.0.0"
+globset = "0.4.18"
+ignore = "0.4.25"
+reqwest = { version = "0.13.4", default-features = false, features = [
+    "blocking",
+    "json",
+    "stream",
+    "rustls",
+    "gzip",
+] }
+serde = { version = "1.0.228", features = ["derive", "rc"] }
+serde_json = "1.0.150"
+serde_yaml = "0.9"
+tracing = "0.1.43"
+uuid = { version = "1.23.1", features = ["v4", "serde"] }
+state-macro = { path = "crates/state-macro" }
+cui-derive = { path = "crates/cui-derive" }
+
+[workspace.lints.clippy]
+all = { level = "warn", priority = -1 }
+
+[package]
+name = "cui"
+version = "0.1.0"
+edition = "2024"
+
+[features]
+default = ["prompts"]
+prompts = []
+instructions = ["dep:globset", "dep:ignore", "dep:anyhow", "dep:dirs", "dep:reqwest"]
+test-utils = []
+
+[dependencies]
+state-macro = { workspace = true }
+serde = { workspace = true, features = ["derive"] }
+serde_json = { workspace = true }
+serde_yaml = { workspace = true }
+cui-derive = { workspace = true }
+tracing = { workspace = true }
+ignore = { workspace = true, optional = true }
+dirs = { workspace = true, optional = true }
+reqwest = { workspace = true, features = ["blocking"], optional = true }
+globset = { workspace = true, optional = true }
+anyhow = { workspace = true, optional = true }
+syntect = { version = "5", default-features = false, features = ["parsing", "html", "default-syntaxes", "default-themes", "regex-fancy"] }
+
+[dev-dependencies]
+uuid = { workspace = true }
+
+[lints]
+workspace = true
