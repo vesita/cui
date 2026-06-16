@@ -1,0 +1,13 @@
+---
+id: review
+title: 审查结果
+when: review
+---
+变更摘要与测试结果审查。
+
+**文件变更**:
+- `src/main.rs`: +12 / -3
+- `src/lib.rs`: +5 / -2
+- `tests/unit.rs`: +30 (新增)
+
+**测试结果**: ✅ 全部通过 (18/18)

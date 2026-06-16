@@ -1,0 +1,11 @@
+---
+id: header
+title: 工作流引擎
+priority: critical
+inert: true
+---
+当前正在执行 Agent 工作流。
+
+- **阶段**: 运行时动态切换
+- **预算**: 256K tokens
+- **策略**: 按优先级降级/升级组件

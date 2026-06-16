@@ -286,8 +286,8 @@ mod tests {
             .build();
         tree.push(node);
         let output = tree.render(500, None, 0);
-        assert!(output.contains("[section]"));
-        assert!(output.contains("[a]"));
-        assert!(output.contains("[b]"));
+        assert!(output.contains("[分区]"));
+        assert!(output.contains("[A]"));
+        assert!(output.contains("[B]"));
     }
 }

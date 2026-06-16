@@ -1,0 +1,14 @@
+---
+id: act_files
+title: 文件操作
+when: act
+type: tool
+priority: high
+collapsible: true
+---
+读取与写入文件内容。
+
+**支持的操作**:
+- `read_file(path)` — 读取文件
+- `write_file(path, content)` — 写入文件
+- `list_dir(path)` — 列出目录

@@ -1,10 +1,10 @@
 # CUI —— 面向 LLM Agent 的上下文 UI 框架
 
-**CUI** 将 LLM 的上下文窗口视为**渲染画布**。它借鉴 React/Dioxus 的组件模型，提供声明式、可交互的组件树，渲染为 LLM 可解析的文本格式（YAML frontmatter + Markdown body）。
+**CUI** 将 LLM 的上下文窗口视为**渲染画布**。它借鉴 React/Dioxus 的组件模型，提供声明式、可交互的组件树，渲染为 LLM 可解析的紧凑文本格式。
 
 ## 核心理念
 
-- **组件即上下文** — 每个组件渲染为 YAML + Markdown。LLM 通过 `component_action` 工具与之交互。
+- **组件即上下文** — 每个组件渲染为紧凑 Markdown。LLM 通过 `component_action` 工具与之交互。
 - **容量自适应** — 根据 token 预算自动降级/升级组件的展示粒度。
 - **数据与渲染分离** — `ComponentTree` 是纯数据模型，`Context` 持有渲染状态机和管线。
 - **类型驱动** — 声明 `type: tool` 即可获得默认行为，零样板代码。
@@ -18,8 +18,14 @@ let mut ctx = Cui::init()
     .section("essential/goals.cui")
     .build();
 
-ctx.set_condition("plan");
-let output = ctx.render();
+// 条件渲染 —— 渲染后条件自动清除
+let output = ctx.in_condition("plan").render();
+
+// 多条件 OR + 预算控制
+let output = ctx.in_condition("plan")
+    .and("act")
+    .with_budget(50000)
+    .render();
 ```
 
 ## 渲染级别
@@ -41,6 +47,20 @@ priority: high
 when: act
 ---
 执行 Shell 命令并返回结果。
+```
+
+## 输出格式
+
+```
+## [标题]              ← 组件标题
+正文内容...             ← Markdown
+`[expand]` `[collapse]`  ← 交互动作
+
+## [_recent]           ← 近期操作（3 轮记忆）
+  ·[Bash] expand ✓
+
+## [_overview]         ← 隐藏组件列表
+  `plan` `review` `[expand_hidden]`
 ```
 
 ## 功能特性

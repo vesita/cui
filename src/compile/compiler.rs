@@ -479,6 +479,7 @@ impl Compiler {
             let leaf = CuiFileLeaf::new(&resolved.id, &resolved.title, &resolved.body)
                 .priority(resolved.priority)
                 .kind(resolved.kind)
+                .with_condition(comp.visibility_condition())
                 .with_inputs(comp.inputs().to_vec())
                 .with_outputs(comp.outputs().to_vec());
             let leaf = if resolved.inert { leaf.inert() } else { leaf };

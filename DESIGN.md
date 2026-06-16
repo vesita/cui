@@ -6,7 +6,7 @@ CUI（Context UI）是一个面向 LLM Agent 的上下文 UI 框架。它将 LLM
 
 **核心理念**：
 
-- **组件即上下文** — 每个组件将自身渲染为 YAML frontmatter + Markdown body，LLM 通过 `component_action` 工具与之交互
+- **组件即上下文** — 每个组件渲染为紧凑 Markdown，LLM 通过 `component_action` 工具与之交互
 - **容量自适应** — 上下文窗口有 token 上限，框架根据容量自动降级/升级组件展示粒度
 - **数据与渲染分离** — ComponentTree 是纯数据模型，Context 持有渲染状态机和管线
 - **类型驱动** — 声明 `type: tool` 即可获得默认行为，减少样板代码
@@ -26,12 +26,12 @@ Context::render() 管线：
   2. tree.prepare(budget, tick) → 容量规划 + 可见性评估
   3. cycle → Rendering
   4. tree.render_plan(plan, tick) → 生成输出字符串
-  5. tree.commit() → 清理副作用
+  5. tree.commit() → 清理副作用 / 推进 recent_ticks
   6. tick += 1，清理过期 temp_expand
   7. cycle → Idle
 ```
 
-**关键设计**：虚拟渲染（`render_volatile`）走 prepare → render_plan → abort，不推进 tick，不影响组件状态。用于统计行数等只读场景。
+**关键设计**：虚拟渲染（`render_volatile`）走 prepare → render_plan → abort，不推进 tick，不影响组件状态。
 
 ## 三、组件系统
 
@@ -69,10 +69,12 @@ pub trait BaseComponent: Send {
 纯数据模型，存储：
 
 - `roots` — 根组件列表
-- `global_state` — 全局键值状态（如 `condition`）
+- `global_state` — 全局键值状态
 - `component_state` — 按组件 ID 命名空间的状态
 - `temp_expand` — 临时展开标记（id + expires_at）
 - `triggered` — 已触发事件集合
+- `recent` / `recent_ticks` — 操作记录（保留 3 tick 后清理）
+- `active_conditions` — 当前活跃条件集（内部使用）
 
 **不与 tick/渲染状态机耦合** — 这些由 Context 管理。
 
@@ -115,14 +117,22 @@ pub enum RenderLevel {
 ```rust
 pub enum VisibilityCondition {
     Always,              // 始终可见
-    When(String),        // condition 匹配时可见
+    When(String),        // 条件匹配时可见
     OnTrigger(String),   // 外部事件触发后可见
 }
 ```
 
-- 框架从 `global_state["condition"]` 读取当前条件
-- `When("act")` 表示仅在 `condition=act` 时可见
-- `OnTrigger("config_changed")` 在 `ctx.trigger("config_changed")` 后激活
+渲染期条件过滤 API（chain 风格，渲染后自动清除）：
+
+```rust
+ctx.render()                                    // 无条件，仅 Always
+ctx.in_condition("plan").render()               // When("plan") + Always
+ctx.in_condition("plan").and("act").render()    // OR 逻辑
+ctx.in_condition("plan").with_budget(800).render()
+
+ctx.trigger("config_changed");                  // OnTrigger 事件
+ctx.render();                                   // OnTrigger 组件当次可见
+```
 
 ## 七、Tick 系统
 
@@ -132,6 +142,7 @@ pub enum VisibilityCondition {
 - 虚拟渲染（`render_volatile`）不推进 tick
 - `temp_expand` 使用绝对 tick 作为过期时间：`expires_at = current_tick + duration`
 - 每次渲染后自动清理过期 temp_expand（`tick >= expires_at`）
+- `recent` 操作记录每 3 tick 清空一次，帮助 AI 记住近期操作
 
 ## 八、内置组件
 
@@ -167,19 +178,27 @@ when: act
 
 ## 十、输出格式
 
-渲染输出为 YAML frontmatter + Markdown body 的级联：
+渲染输出为紧凑 Markdown 格式，title 即组件标题：
 
 ```text
-## [_recent]
-  - 组件已添加
-  - 数据已写入
+## [工作流引擎]
+当前正在执行 Agent 工作流。
 
----
-type: text_block
-id: my_block
----
-[my_block]
-正文内容
+## [规划方案]
+分析用户意图并生成执行计划。
+
+`[展开]` `[折叠]`
+
+## [_recent]                    ← 近 3 轮操作记录
+  ·[Bash 执行] expand ✓
+
+## [_overview]                  ← 隐藏组件列表
+  `bash` `review` `[expand_hidden]`
 ```
 
-AI 通过 `component_action` 工具发送 JSON 请求与组件交互（展开、折叠、写入等）。
+- `## [title]` — 用 title 做标题，id 保留给 `component_action` 引用
+- `## [title] ●` — dirty 标记，组件有未消费的数据变更
+- `` `[action]` `` — 内联代码格式的可交互动作
+- `[_recent]` — 近期操作记录，每 3 tick 清空
+- `[_overview]` — 一行紧凑列出所有隐藏组件 ID
+- AI 通过 `component_action(component_id, action, params)` 与组件交互

@@ -345,7 +345,7 @@ mod tests {
     fn label_renders_via_render_node() {
         let node = label("my_label", "我的标题");
         let out = node.render_node(RenderLevel::Standard);
-        assert!(out.contains("[my_label]"), "output: {out}");
+        assert!(out.contains("[我的标题]"), "output: {out}");
         assert!(out.contains("我的标题"), "output: {out}");
     }
 

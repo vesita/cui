@@ -4,7 +4,7 @@ title: CUI 框架参考
 priority: critical
 inert: true
 static: true
-summary: CUI v0.1 — 组件化上下文 UI，AI 通过 `component_action` 工具交互
+summary: CUI v0.1 — 组件化上下文 UI，title 即标题，紧凑输出
 actions:
   - {id: expand, label: 展开完整参考, target: detailed}
   - {id: collapse, label: 折叠, target: summary, show: '>summary'}
@@ -12,33 +12,37 @@ actions:
 
 ## 输出格式
 ```
-## [id] title level [priority] ~ body [action1|action2]
-  body 续行（缩进 2 空格）
+## [title]          ← 组件标题（即 .cui 文件的 title 字段）
+  body 续行          ← body 直接作为 Markdown 正文
+  `[action1]` `[action2]`   ← 可交互动作
 ```
+
 | 标记 | 含义 |
-|--|--|
-| `[id]` | 组件标识 |
-| `level` | 渲染级别：`hidden`/`title`/`summary`/`normal`/`detailed` |
-| `[priority]` | 仅非 normal 出现：`critical`/`high`/`low`/`minimal` |
-| `~` | header/body 分隔 |
-| `[action1\|action2]` | 可交互动作，超 3 个截断为 `[+N more]` |
-| `[+N more]` | 动作列表截断，调用 `component_action` 展开 |
-| `● [id]` | dirty 标记：有未消费变更 |
+|------|------|
+| `## [标题]` | 用 title 做标题，id 保留给 component_action 引用 |
+| `## [标题] ●` | dirty 标记：有未消费数据变更 |
+| `[action1]` | 组件动作，`component_action` 调用 |
+| `## [_overview]` | 隐藏组件列表（一行紧凑） |
+| `## [_recent]` | 近期操作记录（保留 3 轮） |
 
 ## 示例
 ```
-## [env] 环境变量 normal ~ 分支: main | 提交: abc123 [expand|refresh]
-## [file_tree] 文件树 summary ~ src/
-  src/main.rs
-  src/lib.rs
+## [工作流引擎]
+当前正在执行 Agent 工作流。
+- 阶段: 运行时动态切换
+
+## [规划方案]
+分析用户意图并生成执行计划。
+
+`[展开]` `[折叠]`
+
 ## [_overview]
-    [metrics] [expand:metrics]
-    [results]
+  `bash` `files` `review` `[expand_hidden]`
+
 ## [_recent]
-  ·[env] expand → detailed ✓
-  ·[file_tree] refresh ✓
+  ·[Bash 执行] expand ✓
 ```
 
-- `## [_overview]` — 隐藏组件总览区
-- `## [_recent]` — 近期操作日志
-- AI 通过 `component_action` 的 `action`/`params` 参数与组件交互
+- `[_overview]` — 一行列出所有隐藏组件 ID
+- `[_recent]` — 近 3 次渲染中的操作记录
+- AI 通过 `component_action` 的 `component_id` + `action` 与组件交互

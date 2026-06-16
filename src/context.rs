@@ -154,30 +154,6 @@ impl Context {
         self.dialogue.clear();
     }
 
-    // ── 条件管理 ───────────────────────────────────────
-
-    /// 添加条件到活跃集，供 [`VisibilityCondition::When`] 组件评估。
-    ///
-    /// 多个条件可同时活跃；`When("plan")` 在 `"plan"` 属于活跃集时可见。
-    ///
-    /// ```ignore
-    /// ctx.set_condition("plan");         // 添加 plan 条件
-    /// ctx.set_condition("skill_debug");  // 再添加 skill_debug，与 plan 共存
-    /// ```
-    pub fn set_condition(&mut self, value: &str) {
-        self.tree.add_condition(value);
-    }
-
-    /// 清空所有活跃条件。
-    pub fn clear_conditions(&mut self) {
-        self.tree.clear_conditions();
-    }
-
-    /// 移除一条活跃条件。
-    pub fn remove_condition(&mut self, value: &str) {
-        self.tree.remove_condition(value);
-    }
-
     // ── 渲染 ───────────────────────────────────────────
 
     /// 以默认预算渲染所有组件。
@@ -185,25 +161,31 @@ impl Context {
         self.render_impl(DEFAULT_RENDER_BUDGET)
     }
 
-    /// 以指定 token 预算渲染。
-    pub fn render_with_budget(&mut self, budget: usize) -> String {
-        self.render_impl(budget)
-    }
-
     /// 虚拟渲染（不推进 tick，不清理状态），默认预算。
     pub fn render_volatile(&mut self) -> String {
         self.render_volatile_impl(DEFAULT_RENDER_BUDGET)
     }
 
-    /// 虚拟渲染，指定预算。
-    pub fn render_volatile_with_budget(&mut self, budget: usize) -> String {
-        self.render_volatile_impl(budget)
+    /// 指定 token 预算。
+    ///
+    /// ```ignore
+    /// ctx.with_budget(50000).render();
+    /// ctx.with_budget(50000).render_volatile();
+    /// ```
+    pub fn with_budget(&mut self, budget: usize) -> BudgetRender<'_> {
+        BudgetRender {
+            ctx: self,
+            budget: budget.max(1),
+        }
     }
 
-    /// 添加条件后渲染（条件保留在活跃集中）。
-    pub fn render_with_condition(&mut self, condition: &str) -> String {
-        self.set_condition(condition);
-        self.render_impl(DEFAULT_RENDER_BUDGET)
+    /// 在指定条件下渲染。渲染完成后条件自动清除，不持久化。
+    pub fn in_condition(&mut self, condition: &str) -> ConditionRender<'_> {
+        ConditionRender {
+            ctx: self,
+            conditions: vec![condition.to_string()],
+            budget: DEFAULT_RENDER_BUDGET,
+        }
     }
 
     /// 内部实现：按指定预算执行完整渲染管线。
@@ -595,6 +577,16 @@ impl Context {
             self.tree.set_temp_expand(id, 3, self.tick);
         }
 
+        // 记录操作到 recent，帮助 AI 记住历史操作
+        if result.is_success() {
+            let title = self
+                .tree
+                .find(id)
+                .map(|n| n.title().to_string())
+                .unwrap_or_else(|| id.to_string());
+            self.tree.add_recent(&title, action, true);
+        }
+
         // 发射生命周期事件
         self.emit(
             id,
@@ -850,6 +842,66 @@ impl TemplateResolver for Context {
     }
 }
 
+// ── ConditionRender ──────────────────────────────────────────
+
+/// 条件渲染构建器，由 [`Context::in_condition`] 返回。
+///
+/// 在渲染时将指定条件应用于组件树的 `VisibilityCondition::When` 评估。
+/// 渲染完成后条件自动清除，不会持久化到 `ComponentTree`。
+pub struct ConditionRender<'a> {
+    ctx: &'a mut Context,
+    conditions: Vec<String>,
+    budget: usize,
+}
+
+impl ConditionRender<'_> {
+    /// 添加额外条件（OR 逻辑）。
+    pub fn and(mut self, condition: &str) -> Self {
+        self.conditions.push(condition.to_string());
+        self
+    }
+
+    /// 指定 token 预算。
+    ///
+    /// ```ignore
+    /// ctx.in_condition("plan").with_budget(50000).render();
+    /// ```
+    pub fn with_budget(mut self, budget: usize) -> Self {
+        self.budget = budget;
+        self
+    }
+
+    /// 渲染。
+    pub fn render(self) -> String {
+        let old = self.ctx.tree().conditions_snapshot();
+        self.ctx.tree_mut().clear_conditions();
+        for c in &self.conditions {
+            self.ctx.tree_mut().add_condition(c);
+        }
+        let output = self.ctx.render_impl(self.budget);
+        self.ctx.tree_mut().restore_conditions(old);
+        output
+    }
+}
+
+/// 预算渲染构建器，由 [`Context::with_budget`] 返回。
+pub struct BudgetRender<'a> {
+    ctx: &'a mut Context,
+    budget: usize,
+}
+
+impl BudgetRender<'_> {
+    /// 渲染。
+    pub fn render(self) -> String {
+        self.ctx.render_impl(self.budget)
+    }
+
+    /// 虚拟渲染（不推进 tick）。
+    pub fn render_volatile(self) -> String {
+        self.ctx.render_volatile_impl(self.budget)
+    }
+}
+
 /// 合并动作预设参数和请求参数。
 ///
 /// `preset` 来自 `ActionDef.params`（.cui 文件中声明），
@@ -896,3 +948,6 @@ fn json_value_to_string(v: &serde_json::Value) -> String {
         other => other.to_string(),
     }
 }
+
+#[cfg(test)]
+mod tests;

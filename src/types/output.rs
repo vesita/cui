@@ -1,23 +1,14 @@
-//! 语义化输出格式 —— Markdown 标题 + 按行排列的元数据 + `---` 分隔体 + 内联代码动作。
+//! 语义化输出格式 —— 紧凑的 Markdown 标题 + 正文 + 内联动作。
 //!
 //! 格式：
 //! ```text
-//! ## [id]
-//! title: 标题
-//! level: `detailed`
-//! priority: `high`
-//! dirty
-//! ---
+//! ## [标题]
 //! body content (标准 Markdown)
 //!
 //! `[action1]` `[action2]`
 //! ```
 //!
-//! - 元数据每行一个信号，`---` 明确分隔元数据与正文
-//! - title 仅在不同于 id 且非空时输出
-//! - level 总是输出，用反引号包裹
-//! - priority 仅非 Normal 时输出
-//! - dirty 作为裸词标记
+//! - 标题用 `[title]` 包裹，dirty 时附加 ● 标记
 //! - body 直接作为 Markdown 正文
 //! - actions 用内联代码格式
 
@@ -31,72 +22,49 @@ pub fn render_delta_marker(id: &str) -> String {
 }
 
 /// 渲染组件为语义化格式。
+///
+/// 输出格式：
+/// ```text
+/// ## [标题]
+/// body...
+///
+/// `[action1]` `[action2]`
+/// ```
+///
+/// dirty 时在标题后附加 ● 标记。
 pub fn render_component(
     id: &str,
     title: &str,
-    level: RenderLevel,
+    _level: RenderLevel,
     body: &str,
     actions: &[ActionDef],
     dirty: bool,
-    priority: PriorityLevel,
+    _priority: PriorityLevel,
 ) -> String {
     let mut out = String::new();
 
-    // ## [id]
+    // ## [标题]（或 ## [标题] ●）
+    let display_title = if title.is_empty() { id } else { title };
     out.push_str("## [");
-    out.push_str(id);
+    out.push_str(display_title);
     out.push(']');
-    out.push('\n');
-
-    // title: 标题（仅在不同于 id 且非空时）
-    if !title.is_empty() && title != id {
-        out.push_str("title: ");
-        out.push_str(title);
-        out.push('\n');
-    }
-
-    // level: `detailed`
-    out.push_str("level: `");
-    out.push_str(level.as_str());
-    out.push('`');
-    out.push('\n');
-
-    // priority: `high`
-    if priority != PriorityLevel::Normal {
-        out.push_str("priority: `");
-        out.push_str(priority.as_str());
-        out.push_str("`\n");
-    }
-
-    // dirty（裸词）
     if dirty {
-        out.push_str("dirty\n");
+        out.push_str(" ●");
     }
+    out.push('\n');
 
     let body = body.trim_end();
-    let has_body = !body.is_empty();
-    let has_actions = !actions.is_empty();
-
-    // --- 分隔线（仅当元数据后有内容时）
-    if has_body || has_actions {
-        out.push_str("---\n");
-    }
-
-    // body
-    if has_body {
+    if !body.is_empty() {
         out.push_str(body);
         if !body.ends_with('\n') {
             out.push('\n');
         }
     }
 
-    // 正文与动作之间的空行
-    if has_body && has_actions {
-        out.push('\n');
-    }
-
-    // `[action1]` `[action2]`
-    if has_actions {
+    if !actions.is_empty() {
+        if !body.is_empty() {
+            out.push('\n');
+        }
         for a in actions.iter() {
             out.push_str("`[");
             out.push_str(a.label());
@@ -130,7 +98,7 @@ mod tests {
             false,
             PriorityLevel::Normal,
         );
-        assert_eq!(out, "## [test]\ntitle: 测试\nlevel: `standard`\n");
+        assert_eq!(out, "## [测试]\n");
     }
 
     #[test]
@@ -144,10 +112,7 @@ mod tests {
             false,
             PriorityLevel::Normal,
         );
-        assert_eq!(
-            out,
-            "## [test]\ntitle: 测试\nlevel: `summary`\n---\nshort body\n"
-        );
+        assert_eq!(out, "## [测试]\nshort body\n");
     }
 
     #[test]
@@ -162,10 +127,7 @@ mod tests {
             false,
             PriorityLevel::Normal,
         );
-        assert_eq!(
-            out,
-            "## [test]\ntitle: 测试\nlevel: `standard`\n---\nfirst line\nsecond line\nthird line\n"
-        );
+        assert_eq!(out, "## [测试]\nfirst line\nsecond line\nthird line\n");
     }
 
     #[test]
@@ -180,10 +142,7 @@ mod tests {
             false,
             PriorityLevel::Normal,
         );
-        assert_eq!(
-            out,
-            "## [test]\ntitle: 测试\nlevel: `standard`\n---\n`[expand]`\n"
-        );
+        assert_eq!(out, "## [测试]\n`[expand]`\n");
     }
 
     #[test]
@@ -198,10 +157,7 @@ mod tests {
             false,
             PriorityLevel::Normal,
         );
-        assert_eq!(
-            out,
-            "## [test]\ntitle: 测试\nlevel: `standard`\n---\ncontent\n\n`[expand]` `[refresh]`\n"
-        );
+        assert_eq!(out, "## [测试]\ncontent\n\n`[expand]` `[refresh]`\n");
     }
 
     #[test]
@@ -215,7 +171,7 @@ mod tests {
             true,
             PriorityLevel::Normal,
         );
-        assert!(out.contains("dirty\n"), "expected dirty flag: {out}");
+        assert!(out.contains("●"), "expected dirty marker: {out}");
     }
 
     #[test]
@@ -224,12 +180,13 @@ mod tests {
             "test",
             "测试",
             RenderLevel::Standard,
-            "",
+            "content",
             &[],
             false,
             PriorityLevel::High,
         );
-        assert!(out.contains("priority: `high`"));
+        assert!(out.contains("[测试]"));
+        assert!(out.contains("content"));
     }
 
     #[test]
@@ -243,11 +200,7 @@ mod tests {
             false,
             PriorityLevel::Normal,
         );
-        // 仅去除尾随空白，前导空白保留
-        assert_eq!(
-            out,
-            "## [test]\ntitle: 测试\nlevel: `standard`\n---\n  spaced\n"
-        );
+        assert_eq!(out, "## [测试]\n  spaced\n");
     }
 
     #[test]
@@ -263,8 +216,7 @@ mod tests {
             false,
             PriorityLevel::Normal,
         );
-        assert!(out.starts_with("## [comp]\n"));
-        assert!(out.contains("title: C\n"));
+        assert!(out.starts_with("## [C]\n"));
         assert!(out.contains("line one\n"));
         assert!(out.contains("\n`[a]` `[b]` `[c]` `[d]`\n"));
     }

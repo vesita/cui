@@ -1,0 +1,16 @@
+---
+id: act_bash
+title: Bash 执行
+when: act
+type: tool
+priority: high
+---
+执行 Shell 命令并返回结果。
+
+```json
+{
+  "command": "cargo build --release",
+  "timeout": 120,
+  "capture": ["stdout", "stderr"]
+}
+```

@@ -63,6 +63,7 @@ pub struct ComponentTree {
     /// `expires_at` 为绝对 tick 值，当 `tick >= expires_at` 时自动失效。
     temp_expand: Option<(String, u64)>,
     recent: Vec<ActionRecord>,
+    recent_ticks: u8,
     overview_expanded: bool,
     delta_mode: bool,
 }
@@ -84,6 +85,7 @@ impl ComponentTree {
             active_conditions: HashSet::new(),
             temp_expand: None,
             recent: Vec::new(),
+            recent_ticks: 0,
             overview_expanded: false,
             delta_mode: false,
         }
@@ -95,12 +97,6 @@ impl ComponentTree {
             "重复组件 ID: {} 已存在于树中",
             node.id()
         );
-        self.recent.push(ActionRecord {
-            component_title: node.title().to_string(),
-            action: "已添加".to_string(),
-            target_level: None,
-            success: true,
-        });
         self.roots.push(node);
         let last = self.roots.last_mut().expect("刚 push 的节点应存在");
         if let Some(lc) = &mut last.info_mut().lifecycle {
@@ -111,16 +107,9 @@ impl ComponentTree {
     pub fn remove(&mut self, id: &str) -> Option<ComponentNode> {
         // 先查根级别
         if let Some(idx) = self.roots.iter().position(|n| n.id() == id) {
-            let title = self.roots[idx].title().to_string();
             if let Some(lc) = &mut self.roots[idx].info_mut().lifecycle {
                 lc.on_unmount();
             }
-            self.recent.push(ActionRecord {
-                component_title: title,
-                action: "已移除".to_string(),
-                target_level: None,
-                success: true,
-            });
             if self
                 .temp_expand
                 .as_ref()
@@ -133,13 +122,6 @@ impl ComponentTree {
         // 递归搜索 Composite 子节点
         for root in self.roots.iter_mut() {
             if let Some(removed) = root.remove_child(id) {
-                let title = removed.title().to_string();
-                self.recent.push(ActionRecord {
-                    component_title: title,
-                    action: "已移除".to_string(),
-                    target_level: None,
-                    success: true,
-                });
                 if self
                     .temp_expand
                     .as_ref()
@@ -487,8 +469,8 @@ impl ComponentTree {
             })
             .collect();
 
-        // recent block
-        let recent_actions = std::mem::take(&mut self.recent);
+        // recent block — clone to preserve across ticks (cleared every 3)
+        let recent_actions = self.recent.clone();
         let recent_rendered = render_recent_actions(&recent_actions);
         let overhead = recent_rendered
             .as_ref()
@@ -643,65 +625,20 @@ impl ComponentTree {
 
         // 概述区（可见内容之后）
         if !plan.hidden_info.is_empty() {
-            output.push_str("## [_overview]\n");
-            let non_inert: Vec<_> = plan
+            output.push_str("## [_overview]\n  ");
+            let ids: Vec<String> = plan
                 .hidden_info
                 .iter()
-                .filter(|(_, inert, _, _)| !inert)
+                .map(|(id, _, dirty, _)| {
+                    if *dirty {
+                        format!("`{id}`●")
+                    } else {
+                        format!("`{id}`")
+                    }
+                })
                 .collect();
-            let inert_count = plan
-                .hidden_info
-                .iter()
-                .filter(|(_, inert, _, _)| *inert)
-                .count();
-
-            if plan.overview_expanded {
-                output.push_str("  隐藏组件：\n");
-                for (id, _, dirty, is_composite) in &plan.hidden_info {
-                    let marker = if *dirty { " ●" } else { "" };
-                    let toast = self
-                        .temp_expand
-                        .as_ref()
-                        .filter(|(te_id, _)| te_id == id)
-                        .map(|(_, expires_at)| {
-                            format!(" `temp({})`", expires_at.saturating_sub(current_tick))
-                        })
-                        .unwrap_or_default();
-                    let action = if *is_composite {
-                        "expand_group"
-                    } else {
-                        "expand"
-                    };
-                    output.push_str(&format!(
-                        "    - `{id}`{marker} → `{action}:{id}` `temp_expand:{id}`{toast}\n"
-                    ));
-                }
-            } else {
-                for (id, _, dirty, is_composite) in &non_inert {
-                    let marker = if *dirty { " ●" } else { "" };
-                    let toast = self
-                        .temp_expand
-                        .as_ref()
-                        .filter(|(te_id, _)| te_id == id)
-                        .map(|(_, expires_at)| {
-                            format!(" `temp({})`", expires_at.saturating_sub(current_tick))
-                        })
-                        .unwrap_or_default();
-                    let action = if *is_composite {
-                        "expand_group"
-                    } else {
-                        "expand"
-                    };
-                    output.push_str(&format!(
-                        "    - `{id}`{marker} → `{action}:{id}` `temp_expand:{id}`{toast}\n"
-                    ));
-                }
-                if inert_count > 0 {
-                    output.push_str(&format!(
-                        "   另有 {inert_count} 个惰性组件被压缩 `[expand_hidden]`\n"
-                    ));
-                }
-            }
+            output.push_str(&ids.join(" "));
+            output.push_str(" `[expand_hidden]`\n");
         }
 
         output
@@ -716,6 +653,22 @@ impl ComponentTree {
         }
         self.overview_expanded = false;
         self.triggered.clear();
+
+        self.recent_ticks += 1;
+        if self.recent_ticks >= 3 {
+            self.recent.clear();
+            self.recent_ticks = 0;
+        }
+    }
+
+    /// 添加一条操作记录到 recent（在 [_recent] 中展示约 3 个 tick）。
+    pub fn add_recent(&mut self, title: &str, action: &str, success: bool) {
+        self.recent.push(ActionRecord {
+            component_title: title.to_string(),
+            action: action.to_string(),
+            target_level: None,
+            success,
+        });
     }
 
     /// 便捷渲染（三步合一）：prepare → render_plan → commit。

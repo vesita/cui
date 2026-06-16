@@ -13,7 +13,7 @@ fn register_and_render() {
     let mut ctx = Context::new();
     ctx.register(text_block("hi", "问候", "你好世界"));
     let output = ctx.render();
-    assert!(output.contains("[hi]"));
+    assert!(output.contains("[问候]"));
     assert!(output.contains("你好世界"));
 }
 
@@ -46,15 +46,15 @@ fn clear_all() {
 fn render_with_condition() {
     let mut ctx = Context::new();
     ctx.register(text_block("c", "C", "content"));
-    let output = ctx.render_with_condition("act");
-    assert!(output.contains("[c]"));
+    let output = ctx.in_condition("act").render();
+    assert!(output.contains("[C]"));
 }
 
 #[test]
-fn render_with_budget() {
+fn render_works() {
     let mut ctx = Context::new();
     ctx.register(text_block("c", "C", "long content here that takes up space"));
-    let output = ctx.render_with_budget(200);
+    let output = ctx.render();
     assert!(!output.is_empty());
 }
 
@@ -318,6 +318,94 @@ fn toast_temp_expand_decrements_on_render() {
 }
 
 #[test]
+fn in_condition_single_shows_matching() {
+    use crate::condition::VisibilityCondition;
+    use crate::component::builtin::TextBlock;
+    let mut ctx = Context::new();
+    ctx.register(
+        TextBlock::new("header", "头部", "always visible").build(),
+    );
+    ctx.register(
+        TextBlock::new("plan", "计划", "plan content")
+            .with_condition(VisibilityCondition::when("plan"))
+            .build(),
+    );
+    ctx.register(
+        TextBlock::new("act", "执行", "act content")
+            .with_condition(VisibilityCondition::when("act"))
+            .build(),
+    );
+
+    let output = ctx.in_condition("plan").render();
+    assert!(output.contains("[头部]"), "Always should render");
+    assert!(output.contains("[计划]"), "plan should render with plan condition");
+    assert!(!output.contains("[执行]"), "act should NOT render with plan condition");
+}
+
+#[test]
+fn in_condition_and_shows_or_logic() {
+    use crate::condition::VisibilityCondition;
+    use crate::component::builtin::TextBlock;
+    let mut ctx = Context::new();
+    ctx.register(
+        TextBlock::new("header", "头部", "always visible").build(),
+    );
+    ctx.register(
+        TextBlock::new("plan", "计划", "plan")
+            .with_condition(VisibilityCondition::when("plan"))
+            .build(),
+    );
+    ctx.register(
+        TextBlock::new("act", "执行", "act")
+            .with_condition(VisibilityCondition::when("act"))
+            .build(),
+    );
+
+    let output = ctx.in_condition("plan").and("act").render();
+    assert!(output.contains("[头部]"));
+    assert!(output.contains("[计划]"));
+    assert!(output.contains("[执行]"));
+}
+
+#[test]
+fn in_condition_clears_after_render() {
+    use crate::condition::VisibilityCondition;
+    use crate::component::builtin::TextBlock;
+    let mut ctx = Context::new();
+    ctx.register(
+        TextBlock::new("plan", "计划", "plan")
+            .with_condition(VisibilityCondition::when("plan"))
+            .build(),
+    );
+
+    // 通过 tree 直接设置一个持久条件，模拟外部已有条件
+    ctx.tree_mut().add_condition("persistent");
+    let output = ctx.in_condition("plan").render();
+    assert!(output.contains("[计划]"));
+    assert!(ctx.tree().has_condition("persistent"), "persistent condition should survive");
+    assert!(!ctx.tree().has_condition("plan"), "in_condition should be cleared after render");
+}
+
+#[test]
+fn render_without_condition_hides_when_components() {
+    use crate::condition::VisibilityCondition;
+    use crate::component::builtin::TextBlock;
+    let mut ctx = Context::new();
+    ctx.register(
+        TextBlock::new("header", "头部", "always visible").build(),
+    );
+    ctx.register(
+        TextBlock::new("plan", "计划", "plan")
+            .with_condition(VisibilityCondition::when("plan"))
+            .build(),
+    );
+
+    let output = ctx.render();
+    assert!(output.contains("[头部]"), "Always should render");
+    assert!(!output.contains("plan content"), "when:plan should be hidden without condition");
+}
+
+#[test]
 fn tick_does_not_advance_on_volatile_render() {
     use crate::component::builtin::toast;
     let mut ctx = Context::new();
@@ -325,7 +413,7 @@ fn tick_does_not_advance_on_volatile_render() {
     ctx.toast("t", "hello");
     let tick_before = ctx.tick();
     assert_eq!(tick_before, 0);
-    ctx.render_volatile_with_budget(99999);
+    ctx.with_budget(99999).render_volatile();
     assert_eq!(ctx.tick(), 0);
     let (_, rem) = ctx.tree().temp_expand_info(ctx.tick()).unwrap();
     assert_eq!(rem, 3);
