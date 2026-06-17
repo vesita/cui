@@ -954,7 +954,7 @@ impl<'a> DialogueHandle<'a> {
     /// 按轮次滚动。
     pub fn scroll_cycles(&mut self, step: i32) -> String {
         self.ctx.dialogue
-            .with_dialogue(|ops| match ops.scroll_by_cycles(step) {
+            .with_dialogue(|ops| match ops.scroll_cycles(step) {
                 Some(msg) => format!(r#"{{"success":true,"message":"{}"}}"#, msg),
                 None => r#"{"error":"滚动失败"}"#.to_string(),
             })
@@ -964,14 +964,14 @@ impl<'a> DialogueHandle<'a> {
     /// 对齐到轮次边界。
     pub fn align_turns(&mut self) -> bool {
         self.ctx.dialogue
-            .with_dialogue(|ops| ops.align_to_turn_boundary())
+            .with_dialogue(|ops| ops.align_turns())
             .unwrap_or(false)
     }
 
     /// 展开冷区域。
     pub fn expand_cold(&mut self, start: i32, end: i32) -> String {
         self.ctx.dialogue
-            .with_dialogue(|ops| match ops.expand_cold_zone(start, end) {
+            .with_dialogue(|ops| match ops.expand_cold(start, end) {
                 Some(msg) => format!(r#"{{"success":true,"message":"{}"}}"#, msg),
                 None => r#"{"success":false,"message":"展开失败"}"#.to_string(),
             })
@@ -981,21 +981,21 @@ impl<'a> DialogueHandle<'a> {
     /// 关闭冷区域。
     pub fn close_cold(&mut self) -> bool {
         self.ctx.dialogue
-            .with_dialogue(|ops| ops.close_cold_zone())
+            .with_dialogue(|ops| ops.close_cold())
             .unwrap_or(false)
     }
 
     /// 请求冷区域。
     pub fn request_cold(&mut self) -> bool {
         self.ctx.dialogue
-            .with_dialogue(|ops| ops.request_cold_zone())
+            .with_dialogue(|ops| ops.request_cold())
             .unwrap_or(false)
     }
 
     /// 冷区域倒计时推进。
     pub fn tick_cold(&mut self) -> bool {
         self.ctx.dialogue
-            .with_dialogue(|ops| ops.tick_cold_zone_countdown())
+            .with_dialogue(|ops| ops.tick_cold())
             .unwrap_or(false)
     }
 }

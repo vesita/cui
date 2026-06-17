@@ -51,7 +51,7 @@ impl DialogueManager {
         if let Some(ops) = &self.shared
             && let Ok(guard) = ops.lock()
         {
-            let hot = guard.hot_messages_json();
+            let hot = guard.hot_messages();
             if !hot.is_empty() {
                 return hot;
             }

@@ -390,19 +390,19 @@ pub trait DialogueOps {
     /// 滚动到绝对位置（0=开头，-1=末尾）。
     fn scroll_to(&mut self, position: i32) -> Option<String>;
     /// 按轮次相对步数滚动。
-    fn scroll_by_cycles(&mut self, step: i32) -> Option<String>;
+    fn scroll_cycles(&mut self, step: i32) -> Option<String>;
     /// 对齐到轮次边界。
-    fn align_to_turn_boundary(&mut self) -> bool;
+    fn align_turns(&mut self) -> bool;
     /// 展开冷区域消息范围。
-    fn expand_cold_zone(&mut self, start: i32, end: i32) -> Option<String>;
+    fn expand_cold(&mut self, start: i32, end: i32) -> Option<String>;
     /// 关闭冷区域。
-    fn close_cold_zone(&mut self) -> bool;
+    fn close_cold(&mut self) -> bool;
     /// 冷区域续期。
-    fn request_cold_zone(&mut self) -> bool;
+    fn request_cold(&mut self) -> bool;
     /// 倒计时 tick。
-    fn tick_cold_zone_countdown(&mut self) -> bool;
-    /// 返回热窗消息的 JSON 序列化列表（用于 LLM 注入）。
-    fn hot_messages_json(&self) -> Vec<String> {
+    fn tick_cold(&mut self) -> bool;
+    /// 返回热窗消息（JSON 序列化，用于 LLM 注入）。
+    fn hot_messages(&self) -> Vec<String> {
         Vec::new()
     }
 }
