@@ -1,0 +1,53 @@
+---
+id: code_review.plan
+title: 代码审查 - 计划
+when: plan
+inputs:
+  - {name: repo, default: "."}
+  - {name: base_branch, default: "main"}
+  - {name: target_branch, default: "HEAD"}
+---
+分析仓库变更范围，制定审查策略。
+
+**仓库**: {{input:repo}}
+**基准分支**: {{input:base_branch}}
+**目标分支**: {{input:target_branch}}
+
+**审查策略**:
+1. 识别变更文件列表
+2. 按模块分组
+3. 分配审查优先级
+
+---
+id: code_review.act
+title: 代码审查 - 执行
+when: act
+type: tool
+priority: high
+inputs:
+  - {name: files, default: "待扫描..."}
+  - {name: rules, default: "逻辑正确性, 错误处理, 性能, 安全"}
+---
+逐文件执行代码审查规则。
+
+**审查文件**: {{input:files}}
+**审查规则**: {{input:rules}}
+
+---
+id: code_review.review
+title: 代码审查 - 汇总
+when: review
+inputs:
+  - {name: high_issues, default: "无"}
+  - {name: medium_issues, default: "无"}
+  - {name: test_status, default: "未运行"}
+---
+审查结果汇总与改进建议。
+
+**高严重度问题**:
+{{input:high_issues}}
+
+**中严重度问题**:
+{{input:medium_issues}}
+
+**测试结果**: {{input:test_status}}

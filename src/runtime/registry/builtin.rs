@@ -3,9 +3,9 @@
 //! `tool` 和 `section` 是任何 CUI 项目都适用的基础类型。
 //! 项目特有类型应通过 `TypeRegistry::register()` 外部注入。
 
-use super::registry::{ComponentTypeDef, SlotDecl, TypeRegistry};
+use super::registry::{ComponentTypeDef, TypeRegistry};
 use crate::action::ActionDef;
-use crate::keyword::ComponentKind;
+use crate::keyword::{ComponentKind, IoDef, IoType};
 use crate::level::RenderLevel;
 use crate::runtime::handler::ActionHandlerRef;
 
@@ -29,19 +29,21 @@ pub fn builtin_registry() -> TypeRegistry {
                     RenderLevel::Summary,
                 )),
         ],
-        body_template: Some("{{var:body}}".into()),
-        slots: vec![
-            SlotDecl {
+        body_template: Some("{{input:body}}".into()),
+        inputs: vec![
+            IoDef {
                 name: "handler".into(),
-                description: "工具处理器名称（如 tool.read_file）".into(),
+                io_type: IoType::String,
                 required: true,
-                default: None,
+                description: Some("工具处理器名称（如 tool.read_file）".into()),
+                default_value: None,
             },
-            SlotDecl {
+            IoDef {
                 name: "body".into(),
-                description: "工具描述正文".into(),
+                io_type: IoType::String,
                 required: true,
-                default: None,
+                description: Some("工具描述正文".into()),
+                default_value: None,
             },
         ],
         default_priority: None,
@@ -63,7 +65,7 @@ pub fn builtin_registry() -> TypeRegistry {
                 )),
         ],
         body_template: None,
-        slots: vec![],
+        inputs: vec![],
         default_priority: Some(crate::keyword::PriorityLevel::High),
         default_inert: false,
         default_static: false,

@@ -297,15 +297,6 @@ const KW_BUDGET_RATIO: KeywordDef = KeywordDef {
     value_type: "float",
 };
 
-const KW_SLOTS: KeywordDef = KeywordDef {
-    name: "slots",
-    category: KeywordCategory::Interface,
-    required: false,
-    default_value: None,
-    description: "body 中 {{var:name}} 的声明列表，加载时验证",
-    value_type: "list",
-};
-
 const KW_HANDLER: KeywordDef = KeywordDef {
     name: "handler",
     category: KeywordCategory::Presentation,
@@ -372,7 +363,6 @@ static KNOWN_KEYWORDS: &[&KeywordDef] = &[
     &KW_WHEN,
     &KW_VISIBILITY,
     &KW_BUDGET_RATIO,
-    &KW_SLOTS,
     &KW_HANDLER,
     &KW_CONFIDENCE,
     &KW_TRIGGER,

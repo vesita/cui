@@ -1,20 +1,10 @@
-//! YAML frontmatter 解析 —— SlotDef、反序列化类型、可见性解析。
+//! YAML frontmatter 解析 —— 反序列化类型、可见性解析、input 合并。
 
 use crate::condition::VisibilityCondition;
 use crate::keyword::PriorityLevel;
 use crate::level::RenderLevel;
 
 use serde::Deserialize;
-
-// ── SlotDef ──────────────────────────────────────────────────────────
-
-/// 模板插槽定义，支持默认值。
-#[derive(Debug, Clone, Deserialize)]
-pub struct SlotDef {
-    pub name: String,
-    #[serde(default)]
-    pub default: Option<String>,
-}
 
 // ── 优先级反序列化 ────────────────────────────────────────────────
 
@@ -75,8 +65,6 @@ pub(super) struct CuiFrontmatter {
     pub(super) visibility: Option<String>,
     #[serde(default)]
     pub(super) budget_ratio: Option<f32>,
-    #[serde(default)]
-    pub(super) slots: Vec<SlotDef>,
 }
 
 const fn default_priority() -> PriorityLevel {

@@ -45,7 +45,6 @@ mod frontmatter;
 pub use component::CuiFileComponent;
 pub(crate) use component::PROMPT_ESCDIR;
 pub use directory::CuiDirectory;
-pub use frontmatter::SlotDef;
 pub use frontmatter::parse_frontmatter_body;
 
 /// 解析多个 CUI 块（以 `\n---\n` 分隔的多个 frontmatter + body 文档）。

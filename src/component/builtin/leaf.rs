@@ -27,7 +27,7 @@ pub struct CuiFileLeaf {
     pub(crate) body: String,
     pub(crate) data: String,
     pub(crate) condition: VisibilityCondition,
-    pub(crate) slot_values: Vec<(String, String)>,
+    pub(crate) input_values: Vec<(String, String)>,
     pub(crate) kind: ComponentKind,
     pub(crate) inputs: Vec<IoDef>,
     pub(crate) outputs: Vec<IoDef>,
@@ -48,7 +48,7 @@ impl CuiFileLeaf {
             body: body.into(),
             data: String::new(),
             condition: VisibilityCondition::Always,
-            slot_values: Vec::new(),
+            input_values: Vec::new(),
             kind: ComponentKind::default(),
             inputs: Vec::new(),
             outputs: Vec::new(),
@@ -93,13 +93,13 @@ impl CuiFileLeaf {
         self.outputs = outputs;
         self
     }
-    pub fn with_slot(mut self, name: &str, value: &str) -> Self {
-        self.slot_values.push((name.to_string(), value.to_string()));
+    pub fn with_input(mut self, name: &str, value: &str) -> Self {
+        self.input_values.push((name.to_string(), value.to_string()));
         self
     }
-    pub fn with_slots(mut self, slots: &[(&str, &str)]) -> Self {
-        for (k, v) in slots {
-            self.slot_values.push((k.to_string(), v.to_string()));
+    pub fn with_input_values(mut self, values: &[(&str, &str)]) -> Self {
+        for (k, v) in values {
+            self.input_values.push((k.to_string(), v.to_string()));
         }
         self
     }
@@ -150,22 +150,22 @@ impl BaseComponent for CuiFileLeaf {
             RenderLevel::Hidden => String::new(),
             RenderLevel::Title => String::new(),
             RenderLevel::Summary => self.summary.clone().unwrap_or_else(|| {
-                let slot_refs: Vec<(&str, &str)> = self
-                    .slot_values
+                let refs: Vec<(&str, &str)> = self
+                    .input_values
                     .iter()
                     .map(|(k, v)| (k.as_str(), v.as_str()))
                     .collect();
                 let first_line = self.body.lines().next().unwrap_or("").to_string();
-                crate::compile::template::TemplateEngine::fill_slots(&first_line, &slot_refs)
+                crate::compile::template::TemplateEngine::fill_slots(&first_line, &refs)
             }),
             RenderLevel::Standard | RenderLevel::Detailed => {
-                let slot_refs: Vec<(&str, &str)> = self
-                    .slot_values
+                let refs: Vec<(&str, &str)> = self
+                    .input_values
                     .iter()
                     .map(|(k, v)| (k.as_str(), v.as_str()))
                     .collect();
                 let body =
-                    crate::compile::template::TemplateEngine::fill_slots(&self.body, &slot_refs);
+                    crate::compile::template::TemplateEngine::fill_slots(&self.body, &refs);
                 let mut out = body;
                 if !self.data.is_empty() {
                     out.push('\n');
@@ -309,8 +309,8 @@ mod tests {
     }
 
     #[test]
-    fn cui_file_leaf_with_slots() {
-        let leaf = CuiFileLeaf::new("id", "标题", "hello {{var:name}}").with_slot("name", "世界");
+    fn cui_file_leaf_with_input() {
+        let leaf = CuiFileLeaf::new("id", "标题", "hello {{input:name}}").with_input("name", "世界");
         let rendered = leaf.render(RenderLevel::Standard);
         assert!(rendered.contains("hello 世界"));
     }

@@ -13,7 +13,7 @@ use crate::level::RenderLevel;
 use crate::runtime::handler::ActionHandlerRef;
 
 use super::frontmatter::{
-    CuiFrontmatter, SlotDef, parse_frontmatter_body, parse_level, parse_show, parse_visibility,
+    CuiFrontmatter, parse_frontmatter_body, parse_level, parse_show, parse_visibility,
 };
 
 // ── 从 CuiFrontmatter 构建 CuiFileComponent ─────────────────────
@@ -25,8 +25,32 @@ impl CuiFileComponent {
         id: String,
         visibility_cond: VisibilityCondition,
     ) -> Self {
-        let actions: Vec<ActionDef> = fm
-            .actions
+        let CuiFrontmatter {
+            title,
+            priority,
+            id: _fm_id,
+            summary,
+            inert,
+            collapsible,
+            collapsed,
+            is_static,
+            kind,
+            component_type,
+            handler,
+            confidence,
+            trigger,
+            inputs,
+            outputs,
+            actions: fm_actions,
+            children,
+            source,
+            persist,
+            entry,
+            when: _when,
+            visibility: _visibility,
+            budget_ratio,
+        } = fm;
+        let actions: Vec<ActionDef> = fm_actions
             .into_iter()
             .map(|a| {
                 let target_level = a.target.as_deref().and_then(parse_level);
@@ -51,29 +75,28 @@ impl CuiFileComponent {
 
         Self {
             id,
-            title: fm.title,
-            priority: fm.priority,
-            summary: fm.summary,
-            inert: fm.inert,
-            collapsible: fm.collapsible,
-            collapsed: fm.collapsed,
-            is_static: fm.is_static,
-            kind: fm.kind,
-            component_type: fm.component_type,
-            handler: fm.handler,
-            confidence: fm.confidence,
-            trigger: fm.trigger,
-            inputs: fm.inputs,
-            outputs: fm.outputs,
+            title,
+            priority,
+            summary,
+            inert,
+            collapsible,
+            collapsed,
+            is_static,
+            kind,
+            component_type,
+            handler,
+            confidence,
+            trigger,
+            inputs,
+            outputs,
             actions,
             body,
-            children: fm.children,
-            source: fm.source,
-            persist: fm.persist,
-            entry: fm.entry,
+            children,
+            source,
+            persist,
+            entry,
             visibility_cond,
-            budget_ratio: fm.budget_ratio,
-            slots: fm.slots,
+            budget_ratio,
         }
     }
 }
@@ -104,7 +127,6 @@ pub struct CuiFileComponent {
     entry: bool,
     visibility_cond: VisibilityCondition,
     budget_ratio: Option<f32>,
-    slots: Vec<SlotDef>,
 }
 
 impl CuiFileComponent {
@@ -114,7 +136,7 @@ impl CuiFileComponent {
         Self::from_parts(fm_str, body, default_id, None)
     }
 
-    /// 从 `.cui` 文件读取并解析。
+    /// 从 `.cui` 文件读取并解析。返回第一个文档。
     pub fn from_file(path: impl AsRef<Path>) -> Result<Self, String> {
         let path = path.as_ref();
         let content = fs::read_to_string(path)
@@ -125,6 +147,26 @@ impl CuiFileComponent {
             .unwrap_or("unknown");
         let (fm_str, body) = parse_frontmatter_body(&content)?;
         Self::from_parts(fm_str, body, default_id, Some(&path.to_string_lossy()))
+    }
+
+    /// 从 `.cui` 文件读取多文档（`---` 分隔），返回全部组件。
+    pub fn from_file_multi(path: impl AsRef<Path>) -> Result<Vec<Self>, String> {
+        let path = path.as_ref();
+        let content = fs::read_to_string(path)
+            .map_err(|e| format!("读取文件失败 {}: {}", path.display(), e))?;
+        let default_id = path
+            .file_stem()
+            .and_then(|s| s.to_str())
+            .unwrap_or("unknown");
+        crate::compile::compiler::expand_multi_document(&content, default_id)
+    }
+
+    /// 从多文档 `.cui` 文件中按 id 查找组件。
+    pub fn from_file_find(path: impl AsRef<Path>, id: &str) -> Result<Self, String> {
+        Self::from_file_multi(path)?
+            .into_iter()
+            .find(|c| c.id() == id)
+            .ok_or_else(|| format!("多文档文件中未找到 id='{id}' 的组件"))
     }
 
     fn from_parts(
@@ -272,11 +314,18 @@ impl CuiFileComponent {
         }
     }
 
+    pub fn input_values(&self) -> Vec<(String, String)> {
+        self.inputs
+            .iter()
+            .map(|io| {
+                let val = io.default_value.as_deref().unwrap_or("");
+                (io.name.clone(), val.to_string())
+            })
+            .collect()
+    }
+
     pub fn budget_ratio(&self) -> Option<f32> {
         self.budget_ratio
-    }
-    pub fn slots(&self) -> &[SlotDef] {
-        &self.slots
     }
 
     pub fn render_to_string(&self, level: RenderLevel) -> String {

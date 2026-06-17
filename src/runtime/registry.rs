@@ -10,4 +10,4 @@ pub mod builtin;
 pub mod registry;
 
 pub use builtin::builtin_registry;
-pub use registry::{ComponentTypeDef, ResolvedComponent, SlotDecl, TypeRegistry};
+pub use registry::{ComponentTypeDef, ResolvedComponent, TypeRegistry};

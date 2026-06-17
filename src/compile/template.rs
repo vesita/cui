@@ -176,33 +176,31 @@ impl TemplateEngine {
         Self::render_nodes(&nodes, resolver)
     }
 
-    /// 填充 `{{var:name}}` 占位符，将运行时数据注入渲染后的输出。
+    /// 填充 `{{input:name}}` 占位符，将运行时数据注入渲染后的输出。
     ///
-    /// 每个 slot_values 条目格式为 `(name, value)`。
+    /// 每个输入条目格式为 `(name, value)`。
     /// 单次扫描 O(L)，避免了逐 key 调用 `String::replace()` 的二次方行为。
-    /// 填充后仍残留的 `{{var:...}}` 会被清空，防止模板语法泄漏到 AI 输出。
+    /// 填充后仍残留的 `{{input:...}}` 会被清空，防止模板语法泄漏到 AI 输出。
     ///
     /// ```ignore
     /// let output = TemplateEngine::fill_slots(&body, &[("branch", "main"), ("status", "clean")]);
     /// ```
-    pub fn fill_slots(output: &str, slot_values: &[(&str, &str)]) -> String {
+    pub fn fill_slots(output: &str, values: &[(&str, &str)]) -> String {
         use std::collections::HashMap;
-        let map: HashMap<&str, &str> = slot_values.iter().copied().collect();
+        let map: HashMap<&str, &str> = values.iter().copied().collect();
         let mut result = String::with_capacity(output.len());
         let mut rest = output;
-        let marker = "{{var:";
+        let marker = "{{input:";
         while let Some(start) = rest.find(marker) {
             result.push_str(&rest[..start]);
             let after_marker = &rest[start + marker.len()..];
             if let Some(end) = after_marker.find("}}") {
-                let name = &after_marker[..end];
+                let name = after_marker[..end].trim();
                 if let Some(value) = map.get(name) {
                     result.push_str(value);
                 }
-                // 未匹配的占位符静默清空，防止模板语法泄漏到 AI 输出
                 rest = &after_marker[end + 2..];
             } else {
-                // 无闭合 }}，保留为原文
                 result.push_str(&rest[start..]);
                 rest = "";
                 break;

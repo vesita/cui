@@ -1,18 +1,9 @@
-//! 组件类型注册表 —— 类型定义、合并解析、槽位填充。
+//! 组件类型注册表 —— 类型定义、合并解析、输入填充。
 
 use crate::action::ActionDef;
-use crate::keyword::{ComponentKind, PriorityLevel};
+use crate::keyword::{ComponentKind, IoDef, PriorityLevel};
 use crate::runtime::handler::ActionHandlerRef;
 use std::collections::HashMap;
-
-/// 组件类型定义的槽位声明。
-#[derive(Debug, Clone)]
-pub struct SlotDecl {
-    pub name: String,
-    pub description: String,
-    pub required: bool,
-    pub default: Option<String>,
-}
 
 /// 语义组件类型定义。
 ///
@@ -25,10 +16,10 @@ pub struct ComponentTypeDef {
     pub default_kind: ComponentKind,
     /// 类型默认动作列表，与实例动作合并（默认在前，实例在后）。
     pub default_actions: Vec<ActionDef>,
-    /// body 模板（可选）。`{{var:name}}` 占位符从实例字段填充。
+    /// body 模板（可选）。`{{input:name}}` 占位符从实例字段填充。
     pub body_template: Option<String>,
-    /// 槽位声明列表。
-    pub slots: Vec<SlotDecl>,
+    /// 输入定义列表（类型级默认值，实例可通过文件 `inputs:` 覆盖）。
+    pub inputs: Vec<IoDef>,
     /// 默认优先级（实例可通过 `priority:` 覆盖）。
     pub default_priority: Option<PriorityLevel>,
     /// 默认惰性标记。
@@ -108,7 +99,7 @@ impl TypeRegistry {
     /// - kind: 实例优先，无则用类型 default_kind
     /// - priority: 实例优先，无则用类型 default_priority
     /// - actions: 类型默认在前，实例追加在后
-    /// - body: 若类型有 body_template，用实例字段填充 `{{var:name}}`
+    /// - body: 若类型有 body_template，用实例字段填充 `{{input:name}}`
     /// - inert/static: 实例优先，无则用类型默认
     #[allow(clippy::too_many_arguments)]
     pub fn resolve(
@@ -208,19 +199,16 @@ impl TypeRegistry {
 
 /// 简单的键值对模板填充。
 ///
-/// 支持 `{{var:body}}` 和 `{{var:handler}}` 等占位符。
+/// 支持 `{{input:body}}`、`{{input:handler}}`、`{{input:title}}` 等占位符。
 fn fill_template(template: &str, body: &str, handler: Option<&str>) -> String {
     let mut result = template.to_string();
-    // {{var:body}}
-    result = result.replace("{{var:body}}", body);
-    // {{var:handler}}
+    result = result.replace("{{input:body}}", body);
     if let Some(h) = handler {
-        result = result.replace("{{var:handler}}", h);
+        result = result.replace("{{input:handler}}", h);
     } else {
-        result = result.replace("{{var:handler}}", "");
+        result = result.replace("{{input:handler}}", "");
     }
-    // {{var:title}} — 暂不支持，title 直接从实例取
-    result = result.replace("{{var:title}}", "");
+    result = result.replace("{{input:title}}", "");
     result
 }
 
@@ -246,19 +234,21 @@ mod tests {
             name: "tool".into(),
             default_kind: ComponentKind::Block,
             default_actions,
-            body_template: Some("{{var:body}}".into()),
-            slots: vec![
-                SlotDecl {
+            body_template: Some("{{input:body}}".into()),
+            inputs: vec![
+                IoDef {
                     name: "handler".into(),
-                    description: "工具处理器".into(),
+                    io_type: crate::keyword::IoType::String,
                     required: true,
-                    default: None,
+                    description: Some("工具处理器".into()),
+                    default_value: None,
                 },
-                SlotDecl {
+                IoDef {
                     name: "body".into(),
-                    description: "工具描述".into(),
+                    io_type: crate::keyword::IoType::String,
                     required: true,
-                    default: None,
+                    description: Some("工具描述".into()),
+                    default_value: None,
                 },
             ],
             default_priority: None,
@@ -275,7 +265,7 @@ mod tests {
                     .with_target_level(crate::level::RenderLevel::Detailed),
             ],
             body_template: None,
-            slots: vec![],
+            inputs: vec![],
             default_priority: Some(PriorityLevel::High),
             default_inert: false,
             default_static: false,

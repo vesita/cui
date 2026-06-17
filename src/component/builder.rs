@@ -77,6 +77,17 @@ impl CuiBuilder {
         }
     }
 
+    /// 从多文档 `.cui` 文件加载，返回所有 (body, component) 对。
+    fn load_file_multi(path: &str) -> Vec<(String, Option<CuiFileComponent>)> {
+        match CuiFileComponent::from_file_multi(path) {
+            Ok(comps) => comps
+                .into_iter()
+                .map(|c| (c.body().to_string(), Some(c)))
+                .collect(),
+            Err(_) => vec![],
+        }
+    }
+
     fn apply_frontmatter(tb: TextBlock, fm: &CuiFileComponent) -> TextBlock {
         let mut tb = tb.priority(fm.priority());
         if fm.is_inert() {
@@ -138,13 +149,30 @@ impl CuiBuilder {
 
     // ── 批量加载 ────────────────────────────────────────
 
-    /// 批量加载 `.cui` 文件作为 section。
+    /// 批量加载 `.cui` 文件作为 section。自动展开多文档文件。
     ///
     /// 每个文件的前置元数据（priority、when、collapsible、inert 等）自动应用。
     /// `path` 为 `.cui` 文件的完整路径。
     pub fn load_sections(mut self, paths: &[&str]) -> Self {
         for path in paths {
-            self = self.section(path);
+            for (content, fm) in Self::load_file_multi(path) {
+                let (id, title) = fm
+                    .as_ref()
+                    .map(|c| (c.id().to_string(), c.title().to_string()))
+                    .unwrap_or_else(|| {
+                        let stem = path
+                            .split('/')
+                            .next_back()
+                            .unwrap_or(path)
+                            .trim_end_matches(".cui");
+                        (stem.to_string(), stem.to_string())
+                    });
+                let mut tb = TextBlock::new(&id, &title, &content);
+                if let Some(ref fm) = fm {
+                    tb = Self::apply_frontmatter(tb, fm);
+                }
+                self.ctx.register(tb.build());
+            }
         }
         self
     }

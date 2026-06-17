@@ -57,7 +57,7 @@ pub mod syntax;
 
 pub mod runtime;
 pub use runtime::registry::{
-    ComponentTypeDef, ResolvedComponent, SlotDecl, TypeRegistry, builtin_registry,
+    ComponentTypeDef, ResolvedComponent, TypeRegistry, builtin_registry,
 };
 pub use runtime::{capacity, dialogue, event, handler, ordering};
 

@@ -360,28 +360,25 @@ pub fn build_tree_nodes(
     Ok(root)
 }
 
-/// 合并实例 slot 值与类型 slot 默认值（实例优先，类型默认补底）。
-fn merge_slot_defaults(comp: &CuiFileComponent, registry: &TypeRegistry) -> Vec<(String, String)> {
+/// 合并实例输入值与类型输入默认值（实例优先，类型默认补底）。
+fn merge_input_values(comp: &CuiFileComponent, registry: &TypeRegistry) -> Vec<(String, String)> {
     use std::collections::BTreeMap;
     let mut merged: BTreeMap<String, String> = BTreeMap::new();
 
-    // 先填入类型默认值（如果类型定义了该 slot）
     if let Some(type_name) = comp.component_type()
         && let Some(typedef) = registry.lookup(type_name)
     {
-        for slot in &typedef.slots {
-            if let Some(ref default) = slot.default {
+        for input in &typedef.inputs {
+            if let Some(ref default) = input.default_value {
                 merged
-                    .entry(slot.name.clone())
+                    .entry(input.name.clone())
                     .or_insert_with(|| default.clone());
             }
         }
     }
 
-    // 实例值覆盖类型默认
-    for slot in comp.slots() {
-        let val = slot.default.as_deref().unwrap_or("");
-        merged.insert(slot.name.clone(), val.to_string());
+    for (name, val) in comp.input_values() {
+        merged.insert(name, val);
     }
 
     merged.into_iter().collect()
@@ -503,13 +500,12 @@ impl Compiler {
             } else {
                 leaf
             };
-            // 合并实例 slot 值与类型 slot 默认值（实例优先）
-            let slot_pairs: Vec<(String, String)> = merge_slot_defaults(comp, &self.type_registry);
-            let slot_refs: Vec<(&str, &str)> = slot_pairs
+            let input_pairs: Vec<(String, String)> = merge_input_values(comp, &self.type_registry);
+            let input_refs: Vec<(&str, &str)> = input_pairs
                 .iter()
                 .map(|(k, v)| (k.as_str(), v.as_str()))
                 .collect();
-            let leaf = leaf.with_slots(&slot_refs);
+            let leaf = leaf.with_input_values(&input_refs);
             let mut node = leaf.build();
             node.set_actions(resolved.actions);
             return Ok(node);
