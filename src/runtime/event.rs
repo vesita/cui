@@ -5,6 +5,15 @@
 //! 组件通过事件总线发布和订阅事件，无需直接引用对方。
 //! 订阅使用前缀通配模式：`component.*` 匹配所有以 `component.` 开头的事件。
 //!
+//! # 事件类型
+//!
+//! | 事件 kind          | source    | data (JSON)                            | 触发时机           |
+//! |-------------------|-----------|----------------------------------------|-------------------|
+//! | `registered`      | 组件 ID   | `{"id":"<id>"}`                        | `register()`      |
+//! | `removed`         | 组件 ID   | `{"id":"<id>"}`                        | `remove()`        |
+//! | `data_changed`    | 组件 ID   | 写入的原始数据（字符串）                  | `write()`         |
+//! | `action_executed` | 组件 ID   | `{"action":"<name>","success":bool}`   | `component_action()` |
+//!
 //! # 使用
 //!
 //! ```ignore

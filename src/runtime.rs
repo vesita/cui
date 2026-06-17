@@ -16,7 +16,7 @@ pub mod capacity;
 pub mod context;
 pub mod cycle;
 pub(crate) mod dialogue;
-pub(crate) mod event;
+pub mod event;
 pub mod handler;
 pub mod ordering;
 pub mod output;

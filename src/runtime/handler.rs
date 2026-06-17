@@ -172,6 +172,9 @@ pub trait ActionContext {
     fn read(&self, component_id: &str) -> Option<String>;
     /// 发送事件（跨组件通信）。
     fn emit(&mut self, source: &str, kind: &str, data: &str);
+    /// 订阅事件（跨组件通信）。
+    fn on(&mut self, _pattern: &str, _handler: Box<dyn Fn(&crate::runtime::event::ComponentEvent) + Send>) {}
+
     /// 读取全局状态值。
     fn state(&self, key: &str) -> Option<String>;
     /// 设置全局状态值。

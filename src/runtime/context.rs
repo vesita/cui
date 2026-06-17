@@ -544,6 +544,17 @@ impl Context {
         self.event_bus.emit(ComponentEvent::new(source, kind, data));
     }
 
+    /// 订阅事件。
+    ///
+    /// `pattern` 支持通配符：
+    /// - `"dialogue.data_changed"` — 精确匹配
+    /// - `"dialogue.*"` — 匹配该组件所有事件
+    /// - `"*.data_changed"` — 匹配所有组件的 data_changed
+    /// - `"*"` — 匹配所有事件
+    pub fn on(&mut self, pattern: &str, handler: Box<dyn Fn(&ComponentEvent) + Send>) {
+        self.event_bus.on(pattern, handler);
+    }
+
     /// 处理概述区动作。
     fn handle_overview_action(&mut self, action: &str) -> ActionResult {
         if action == "expand_hidden" {
@@ -694,6 +705,10 @@ impl ActionContext for Context {
 
     fn emit(&mut self, source: &str, kind: &str, data: &str) {
         self.event_bus.emit(ComponentEvent::new(source, kind, data));
+    }
+
+    fn on(&mut self, pattern: &str, handler: Box<dyn Fn(&ComponentEvent) + Send>) {
+        self.event_bus.on(pattern, handler);
     }
 
     fn state(&self, key: &str) -> Option<String> {

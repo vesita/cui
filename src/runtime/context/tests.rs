@@ -420,3 +420,35 @@ fn tick_does_not_advance_on_volatile_render() {
     ctx.render();
     assert_eq!(ctx.tick(), 1);
 }
+
+#[test]
+fn subscribe_to_data_changed_event() {
+    use std::sync::Mutex;
+    let mut ctx = Context::new();
+    let received: std::sync::Arc<Mutex<Vec<String>>> = Default::default();
+    let r = received.clone();
+    ctx.on("test.*", Box::new(move |e| {
+        r.lock().unwrap().push(e.kind.clone());
+    }));
+    ctx.register(text_block("test", "T", "content"));
+    ctx.write("test", DataMode::Overwrite, "hello");
+    let kinds = received.lock().unwrap();
+    assert!(kinds.contains(&"registered".to_string()));
+    assert!(kinds.contains(&"data_changed".to_string()));
+}
+
+#[test]
+fn subscribe_to_action_executed_event() {
+    use std::sync::{Arc, Mutex};
+    let mut ctx = Context::new();
+    let received: Arc<Mutex<Vec<String>>> = Default::default();
+    let r = received.clone();
+    ctx.on("*.action_executed", Box::new(move |e| {
+        r.lock().unwrap().push(e.source.clone());
+    }));
+    ctx.register(text_block("btn", "Btn", "content"));
+    let req = ActionRequest { component_id: "btn".into(), action: "expand".into(), params: None };
+    let _ = ctx.component_action(&req);
+    let sources = received.lock().unwrap();
+    assert!(sources.contains(&"btn".to_string()));
+}
