@@ -36,7 +36,7 @@ pub use component::builtin::{
     text_block, toast,
 };
 pub use component::{
-    BaseComponent, ComponentLifecycle, ComponentNode, ComponentTree, CuiBuilder, Persistable,
+    BaseComponent, ComponentLifecycle, ComponentNode, ComponentTree, Persistable,
     builtin,
 };
 
@@ -65,6 +65,7 @@ pub use runtime::ordering;
 // ── 编译管道 ────────────────────────────────────────
 
 pub mod compile;
+pub use compile::compiler::{Compiler, CompileError, ValidationWarning, compile_sources, ToolPaths, SkillEntries};
 pub use compile::file::{CuiDirectory, CuiFileComponent};
 pub use compile::template::TemplateResolver;
 
@@ -148,8 +149,8 @@ pub use cui_derive::{ActionHandler, BaseComponent};
 pub struct Cui;
 
 impl Cui {
-    /// 创建 [`CuiBuilder`]，开始声明式组装 Context。
-    pub fn init() -> CuiBuilder {
-        CuiBuilder::new()
+    /// 创建 [`Compiler`]，开始声明式组装 Context。
+    pub fn init() -> Compiler {
+        Compiler::new()
     }
 }

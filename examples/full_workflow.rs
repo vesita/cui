@@ -11,16 +11,10 @@ use cui::runtime::handler::{ActionContext, ActionHandler, ActionOutput, HandlerR
 use cui::{Cui, PriorityLevel};
 
 fn main() {
-    // ═══════════════════════════════════════════════════════════
-    // 1. 处理器
-    // ═══════════════════════════════════════════════════════════
     let mut handlers = HandlerRegistry::new();
     handlers.register("tool.read_file", Arc::new(ReadFileHandler));
     handlers.register("tool.run_test", Arc::new(RunTestHandler));
 
-    // ═══════════════════════════════════════════════════════════
-    // 2. 构建：目录加载 + 工具 + 技能 + 处理器
-    // ═══════════════════════════════════════════════════════════
     let mut ctx = Cui::init()
         .without_introduction()
         .load_dir("examples/cui")
@@ -35,14 +29,8 @@ fn main() {
         .handlers(&handlers)
         .build();
 
-    // ═══════════════════════════════════════════════════════════
-    // 3. 运行时数据注入
-    // ═══════════════════════════════════════════════════════════
     ctx.write("act_bash", cui::DataMode::Append, "> 上次: `cargo build` — 0 errors");
 
-    // ═══════════════════════════════════════════════════════════
-    // 4. 阶段渲染
-    // ═══════════════════════════════════════════════════════════
     println!("══════════════ plan 阶段 ══════════════");
     println!("{}", ctx.in_condition("plan").render());
 
@@ -62,7 +50,7 @@ fn main() {
 struct ReadFileHandler;
 impl ActionHandler for ReadFileHandler {
     fn id(&self) -> &str { "tool.read_file" }
-    fn execute(&self, _params: &str, _ctx: &mut dyn ActionContext) -> Result<ActionOutput, String> {
+    fn execute(&self, _params: &str, _ctx: &mut dyn ActionContext) -> Result<ActionOutput, Box<dyn std::error::Error + Send + Sync>> {
         Ok(ActionOutput::success("src/main.rs: 42 行"))
     }
 }
@@ -70,7 +58,7 @@ impl ActionHandler for ReadFileHandler {
 struct RunTestHandler;
 impl ActionHandler for RunTestHandler {
     fn id(&self) -> &str { "tool.run_test" }
-    fn execute(&self, _params: &str, _ctx: &mut dyn ActionContext) -> Result<ActionOutput, String> {
+    fn execute(&self, _params: &str, _ctx: &mut dyn ActionContext) -> Result<ActionOutput, Box<dyn std::error::Error + Send + Sync>> {
         Ok(ActionOutput::success("18/18 通过"))
     }
 }

@@ -10,7 +10,6 @@
 //! - **builtin** — TextBlock、ConditionalBlock 等内置组件
 
 pub mod base;
-pub mod builder;
 pub mod builtin;
 pub(crate) mod iter;
 pub mod node;
@@ -21,7 +20,6 @@ pub mod tree;
 mod tests;
 
 pub use base::{BaseComponent, ComponentLifecycle, Persistable};
-pub use builder::CuiBuilder;
 pub use iter::{AllNodes, AllNodesMut};
 pub use node::{ComponentNode, ComponentSignal, NodeInfo, NodeSchema};
 pub use snapshot::{NodeSnapshot, TreeSnapshot, TreeStats};

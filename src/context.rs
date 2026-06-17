@@ -540,7 +540,7 @@ impl Context {
                                     "action_executed",
                                     &format!(r#"{{"action":"{action}","success":false}}"#),
                                 );
-                                return ActionResult::error(id, action, e);
+                                return ActionResult::error(id, action, e.to_string());
                             }
                         }
                     } else {

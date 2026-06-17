@@ -209,8 +209,8 @@ pub fn derive_action_handler(input: TokenStream) -> TokenStream {
                 &self,
                 params: &str,
                 ctx: &mut dyn ::cui::ActionContext,
-            ) -> ::std::result::Result<::cui::ActionOutput, String> {
-                self.handle(params, ctx)
+            ) -> ::std::result::Result<::cui::ActionOutput, Box<dyn ::std::error::Error + Send + Sync>> {
+                self.handle(params, ctx).map_err(|e| Box::new(e) as Box<dyn ::std::error::Error + Send + Sync>)
             }
 
             fn id(&self) -> &str {

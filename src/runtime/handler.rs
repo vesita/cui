@@ -20,7 +20,11 @@ use std::sync::Arc;
 /// 动作处理器 —— 后端系统实现此 trait 以响应 CUI 动作。
 pub trait ActionHandler: Send + Sync {
     /// 执行动作。`params` 为 JSON 字符串，`ctx` 为受限的框架访问接口。
-    fn execute(&self, params: &str, ctx: &mut dyn ActionContext) -> Result<ActionOutput, String>;
+    fn execute(
+        &self,
+        params: &str,
+        ctx: &mut dyn ActionContext,
+    ) -> Result<ActionOutput, Box<dyn std::error::Error + Send + Sync>>;
 
     /// 参数 JSON Schema（可选，用于 AI 理解参数格式）。
     fn params_schema(&self) -> Option<String> {
@@ -252,7 +256,7 @@ mod tests {
             &self,
             params: &str,
             _ctx: &mut dyn ActionContext,
-        ) -> Result<ActionOutput, String> {
+        ) -> Result<ActionOutput, Box<dyn std::error::Error + Send + Sync>> {
             Ok(ActionOutput::success_with_data("ok", params))
         }
         fn id(&self) -> &str {

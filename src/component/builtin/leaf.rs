@@ -125,7 +125,7 @@ pub(crate) fn leaf_apply_override(
     pinned: bool,
 ) {
     if let ComponentNode::Leaf(info) = node {
-        if let Some(comp) = info.component.as_mut().as_any_mut().downcast_mut::<CuiFileLeaf>() {
+        if let Some(comp) = info.component.as_mut().as_any_mut().and_then(|a| a.downcast_mut::<CuiFileLeaf>()) {
             if let Some(t) = title {
                 comp.title_override = Some(t.to_string());
             }
@@ -224,8 +224,8 @@ impl BaseComponent for CuiFileLeaf {
         }
     }
 
-    fn as_any_mut(&mut self) -> &mut dyn std::any::Any {
-        self
+    fn as_any_mut(&mut self) -> Option<&mut dyn std::any::Any> {
+        Some(self)
     }
 }
 

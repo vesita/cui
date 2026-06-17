@@ -19,8 +19,10 @@ fn fmt_instruction_source(source: &str, content: &str) -> String {
     let prefix_path =
         concat!(env!("CARGO_MANIFEST_DIR"), "/../../prompt/escdir/system/instruction_source_prefix.cui");
     crate::CuiFileComponent::from_file(prefix_path)
-    .map(|c| c.template(&[("source", source), ("content", content)]))
-    .unwrap_or_default()
+        .map(|c| {
+            c.body().replace("{source}", source).replace("{content}", content)
+        })
+        .unwrap_or_default()
 }
 
 /// 从文件路径向上遍历查找指令文件。

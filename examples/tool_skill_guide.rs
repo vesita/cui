@@ -70,7 +70,7 @@ fn main() {
 struct ReadFileHandler;
 impl ActionHandler for ReadFileHandler {
     fn id(&self) -> &str { "tool.read_file" }
-    fn execute(&self, _params: &str, _ctx: &mut dyn ActionContext) -> Result<ActionOutput, String> {
+    fn execute(&self, _params: &str, _ctx: &mut dyn ActionContext) -> Result<ActionOutput, Box<dyn std::error::Error + Send + Sync>> {
         Ok(ActionOutput::success("读取 src/main.rs: 42 行，无问题"))
     }
 }
@@ -78,7 +78,7 @@ impl ActionHandler for ReadFileHandler {
 struct RunTestHandler;
 impl ActionHandler for RunTestHandler {
     fn id(&self) -> &str { "tool.run_test" }
-    fn execute(&self, _params: &str, _ctx: &mut dyn ActionContext) -> Result<ActionOutput, String> {
+    fn execute(&self, _params: &str, _ctx: &mut dyn ActionContext) -> Result<ActionOutput, Box<dyn std::error::Error + Send + Sync>> {
         Ok(ActionOutput::success("测试通过: 18/18"))
     }
 }
@@ -86,7 +86,7 @@ impl ActionHandler for RunTestHandler {
 struct CodeReviewHandler;
 impl ActionHandler for CodeReviewHandler {
     fn id(&self) -> &str { "tool.code_review" }
-    fn execute(&self, _params: &str, _ctx: &mut dyn ActionContext) -> Result<ActionOutput, String> {
+    fn execute(&self, _params: &str, _ctx: &mut dyn ActionContext) -> Result<ActionOutput, Box<dyn std::error::Error + Send + Sync>> {
         Ok(ActionOutput::success("审查完成: 发现 1 个高严重度问题"))
     }
 }

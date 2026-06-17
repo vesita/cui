@@ -52,7 +52,7 @@ pub struct ResolvedComponent {
 }
 
 /// 类型注册表 —— 名称 → ComponentTypeDef 的映射。
-#[derive(Debug, Default)]
+#[derive(Debug, Default, Clone)]
 pub struct TypeRegistry {
     types: HashMap<String, ComponentTypeDef>,
 }

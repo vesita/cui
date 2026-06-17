@@ -109,7 +109,7 @@ pub trait BaseComponent: Send {
 
     /// 用于内部 downcasting（仅框架内部使用）。
     #[doc(hidden)]
-    fn as_any_mut(&mut self) -> &mut dyn std::any::Any {
-        panic!("as_any_mut not implemented for this component type")
+    fn as_any_mut(&mut self) -> Option<&mut dyn std::any::Any> {
+        None
     }
 }

@@ -297,14 +297,6 @@ impl CuiFileComponent {
         &self.body
     }
 
-    pub fn template(&self, replacements: &[(&str, &str)]) -> String {
-        let mut body = self.body.clone();
-        for (key, value) in replacements {
-            body = body.replace(&format!("{{{}}}", key), value);
-        }
-        body
-    }
-
     pub fn render_body(&self, level: RenderLevel) -> String {
         match level {
             RenderLevel::Hidden => String::new(),
