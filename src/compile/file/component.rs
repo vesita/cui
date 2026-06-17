@@ -359,7 +359,7 @@ impl CuiFileComponent {
         if body.is_empty() {
             return String::new();
         }
-        crate::types::output::render_component(
+        crate::runtime::output::render_component(
             &self.id,
             &self.title,
             level,

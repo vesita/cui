@@ -50,7 +50,6 @@ fn main() {
 
 fn init_scene() -> cui::Context {
     Cui::init()
-        .without_introduction()
         // ── plan 阶段：用 with_input_values() 批量注入 ──
         .component(
             CuiFileLeaf::new(

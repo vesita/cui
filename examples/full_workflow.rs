@@ -16,7 +16,6 @@ fn main() {
     handlers.register("tool.run_test", Arc::new(RunTestHandler));
 
     let mut ctx = Cui::init()
-        .without_introduction()
         .load_dir("examples/cui")
         .tools("tools", "可用工具", PriorityLevel::High, (
             "examples/cui/tools/read_file.cui",

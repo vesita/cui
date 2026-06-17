@@ -11,9 +11,9 @@ use super::base::BaseComponent;
 use super::iter::{AllNodes, AllNodesMut};
 use super::node::ComponentNode;
 use super::snapshot::{NodeSnapshot, TreeSnapshot, TreeStats};
-use crate::render::schedule::{
+use crate::runtime::schedule::{
     self, ActionRecord, MIN_RENDER_BUDGET, RenderPlan, apply_temp_expand_to_tree,
-    apply_visibility_to_tree, composite_child_budget, cool_node_signal, plan_composite_children,
+    apply_visibility_to_tree, cool_node_signal, plan_composite_children,
     render_recent_actions,
 };
 
@@ -474,7 +474,7 @@ impl ComponentTree {
         let recent_rendered = render_recent_actions(&recent_actions);
         let overhead = recent_rendered
             .as_ref()
-            .map_or(0, |s| crate::types::tokenizer::estimate(s) + 1);
+            .map_or(0, |s| crate::tokenizer::estimate(s) + 1);
         let effective = budget.saturating_sub(overhead);
 
         let mut assignments = Vec::new();
@@ -502,27 +502,39 @@ impl ComponentTree {
                 crate::runtime::capacity::plan_tree(&refs, effective, &heatmap, &minimums);
             let total_estimated = capacity_plan.total_estimated;
 
-            // Composite 子节点容量规划（优先级加权）
-            let mut composite_indices: Vec<(usize, usize)> = Vec::new();
+            // Composite 子节点容量规划（剩余预算按比例分配）
+            let mut composites: Vec<(usize, Option<f32>)> = Vec::new();
             for (i, root) in self.roots.iter().enumerate() {
                 let assigned = capacity_plan
                     .assignments
                     .get(i)
                     .map(|a| a.level)
                     .unwrap_or(RenderLevel::Standard);
-                // 使用 effective_level 判断而非原始 assigned，
-                // 避免 is_static / temp_expand 提升后子节点未经容量规划
                 if self.effective_level(root, assigned, current_tick) == RenderLevel::Hidden {
                     continue;
                 }
-                if let ComponentNode::Composite { .. } = root {
-                    let child_budget = composite_child_budget(budget, root);
-                    composite_indices.push((i, child_budget));
+                if let ComponentNode::Composite { budget_ratio, .. } = root {
+                    composites.push((i, *budget_ratio));
                 }
             }
-            for (i, child_budget) in composite_indices {
-                if let Some(root_mut) = self.roots.get_mut(i) {
-                    plan_composite_children(root_mut, child_budget);
+            if !composites.is_empty() {
+                let remaining = effective.saturating_sub(total_estimated);
+                let (with_ratio, without_ratio): (Vec<_>, Vec<_>) =
+                    composites.into_iter().partition(|(_, r)| r.is_some());
+                let total_ratio: f32 = with_ratio.iter().filter_map(|(_, r)| *r).sum::<f32>().max(0.001);
+                let weighted = without_ratio.len();
+                let total_weight = weighted as f32 + total_ratio;
+                for (i, ratio) in &with_ratio {
+                    let share = ((remaining as f32 * ratio.unwrap_or(0.0) / total_weight) as usize).max(1);
+                    if let Some(root_mut) = self.roots.get_mut(*i) {
+                        plan_composite_children(root_mut, share);
+                    }
+                }
+                for (i, _) in &without_ratio {
+                    let share = ((remaining as f32 * 1.0 / total_weight) as usize).max(1);
+                    if let Some(root_mut) = self.roots.get_mut(*i) {
+                        plan_composite_children(root_mut, share);
+                    }
                 }
             }
 

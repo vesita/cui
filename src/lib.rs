@@ -26,7 +26,11 @@
 // ── 基础类型 ──────────────────────────────────────────
 
 pub mod types;
-pub use types::{action, condition, data, keyword, level, manage, output, tokenizer};
+pub use types::{action, condition, data, keyword, level, manage};
+
+// ── 外部子 crate ─────────────────────────────────────
+
+pub use cui_tokenizer as tokenizer;
 
 // ── 组件模型 ────────────────────────────────────────
 
@@ -40,27 +44,18 @@ pub use component::{
     builtin,
 };
 
-// ── 渲染管线 ────────────────────────────────────────
+// ── 运行时服务 ──────────────────────────────────────
 
-pub mod render;
-
-// ── 运行时上下文管理器 ──────────────────────────────
-
-pub mod context;
-pub use context::Context;
+pub mod runtime;
+pub use runtime::context::Context;
+pub use runtime::registry::{
+    ComponentTypeDef, TypeRegistry, builtin_registry,
+};
+pub use runtime::ordering;
 
 // ── 语法高亮 ────────────────────────────────────────
 
 pub mod syntax;
-
-// ── 运行时服务 ──────────────────────────────────────
-
-pub mod runtime;
-pub use runtime::registry::{
-    ComponentTypeDef, TypeRegistry, builtin_registry,
-};
-pub use runtime::handler;
-pub use runtime::ordering;
 
 // ── 编译管道 ────────────────────────────────────────
 
@@ -92,10 +87,10 @@ pub use action::{
 };
 pub use condition::VisibilityCondition;
 pub use data::DataMode;
-pub use handler::{ActionContext, ActionHandler, ActionHandlerRef, ActionOutput, HandlerRegistry};
 pub use keyword::{ComponentKind, IoDef, IoType, PriorityLevel};
 pub use level::RenderLevel;
 pub use ordering::OrderingStrategy;
+pub use runtime::handler::{ActionContext, ActionHandler, ActionHandlerRef, ActionOutput, HandlerRegistry};
 
 // ── 测试工具模块（仅在 test 下编译） ───────────────
 
@@ -116,7 +111,7 @@ pub use runtime::test_utils;
 /// ```
 ///
 /// 若 fields 为空，仅返回 body（无 frontmatter）。
-pub(crate) fn format_cui_block(fields: &[(&str, &str)], body: &str) -> String {
+pub fn format_cui_block(fields: &[(&str, &str)], body: &str) -> String {
     if fields.is_empty() {
         return body.to_string();
     }

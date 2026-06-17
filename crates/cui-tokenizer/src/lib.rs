@@ -172,7 +172,6 @@ mod tests {
     #[test]
     fn short_ascii() {
         let t = estimate("hello world");
-        // "hello" + " " + "world" = 11 chars → ~11/4 + 2*0.1 ≈ 2.95 → 3
         assert!(t >= 1, "short text should be at least 1 token");
         assert!(t <= 5, "11 chars shouldn't exceed 5 tokens");
     }
@@ -180,7 +179,6 @@ mod tests {
     #[test]
     fn cjk_text() {
         let t = estimate("你好世界");
-        // 4 CJK chars at 1 token each = 4
         assert!(t >= 1, "CJK text should have tokens");
         assert!(t <= 5);
     }
@@ -188,7 +186,6 @@ mod tests {
     #[test]
     fn mixed_cjk_and_ascii() {
         let t = estimate("你好 world 世界");
-        // CJK: 4 chars → 4.0, ASCII: 5 chars → 1.25, words: 3 → 0.3 → ~5.55 → 6
         assert!(t >= 2, "mixed text should have tokens");
         assert!(t <= 8);
     }
@@ -197,16 +194,13 @@ mod tests {
     fn long_ascii_text() {
         let text = "The quick brown fox jumps over the lazy dog. This is a longer text that should produce more tokens.";
         let t = estimate(text);
-        // ~100 chars → ~25 chars/token baseline
         assert!(t > 10, "long text should have many tokens");
     }
 
     #[test]
     fn heuristic_is_reasonable() {
-        // A typical component body of ~200 chars
         let text = "This is a sample component body that might be rendered in the CUI framework. It has multiple sentences and describes some state or provides some information to the AI model reading the output.";
         let t = heuristic_estimate(text);
-        // 200+ chars / 4 = 50 baseline, plus word overhead
         assert!(
             t >= 30,
             "200+ char English text should be at least 30 tokens"

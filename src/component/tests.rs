@@ -3,7 +3,7 @@ use crate::action::ActionResult;
 use crate::data::DataMode;
 use crate::keyword::PriorityLevel;
 use crate::level::RenderLevel;
-use crate::render::schedule;
+use crate::runtime::schedule;
 use crate::runtime::test_utils::MockComponent;
 
 // ── ComponentNode 测试 ────────────────────────────────

@@ -189,8 +189,7 @@ impl TemplateEngine {
     /// let output = TemplateEngine::fill_slots(&body, &[("branch", "main"), ("status", "clean")]);
     /// ```
     pub fn fill_slots(output: &str, values: &[(&str, &str)]) -> String {
-        use std::collections::HashMap;
-        let map: HashMap<&str, &str> = values.iter().copied().collect();
+        let lookup = |name: &str| values.iter().find(|(k, _)| *k == name).map(|(_, v)| *v);
         let mut result = String::with_capacity(output.len());
         let mut rest = output;
         let marker = "{{input:";
@@ -199,7 +198,7 @@ impl TemplateEngine {
             let after_marker = &rest[start + marker.len()..];
             if let Some(end) = after_marker.find("}}") {
                 let name = after_marker[..end].trim();
-                if let Some(value) = map.get(name) {
+                if let Some(value) = lookup(name) {
                     result.push_str(value);
                 }
                 rest = &after_marker[end + 2..];

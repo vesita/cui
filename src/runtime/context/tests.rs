@@ -5,7 +5,7 @@ use crate::manage::ManageEvent;
 #[test]
 fn new_context_empty() {
     let ctx = Context::new();
-    assert!(ctx.read_messages().is_empty());
+    assert!(ctx.dialogue().read().is_empty());
 }
 
 #[test]
@@ -122,10 +122,10 @@ fn compress() {
 #[test]
 fn push_and_read_messages() {
     let mut ctx = Context::new();
-    ctx.push_message(r#"{"role":"user"}"#);
-    ctx.push_message(r#"{"role":"assistant"}"#);
-    assert_eq!(ctx.read_messages().len(), 2);
-    assert!(ctx.read_messages()[0].contains("user"));
+    ctx.dialogue_mut().push(r#"{"role":"user"}"#);
+    ctx.dialogue_mut().push(r#"{"role":"assistant"}"#);
+    assert_eq!(ctx.dialogue_mut().read().len(), 2);
+    assert!(ctx.dialogue_mut().read()[0].contains("user"));
 }
 
 #[test]
@@ -259,7 +259,7 @@ fn merge_params_non_json_request() {
 #[test]
 fn collect_persistable_empty() {
     let ctx = Context::new();
-    assert!(ctx.collect_persistable().is_empty());
+    assert!(ctx.persistence().collect().is_empty());
 }
 
 #[test]

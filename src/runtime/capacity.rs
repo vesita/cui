@@ -71,7 +71,7 @@ pub fn plan_tree(
             break;
         }
 
-        let mut candidates: Vec<usize> = (0..n)
+        let candidates: Vec<usize> = (0..n)
             .filter(|&i| levels[i] != RenderLevel::Hidden && !components[i].is_pinned())
             .collect();
 
@@ -79,21 +79,23 @@ pub fn plan_tree(
             break;
         }
 
-        candidates.sort_by(|&a, &b| {
-            let heat_a = heatmap.get(a).copied().unwrap_or(0);
-            let heat_b = heatmap.get(b).copied().unwrap_or(0);
-            match (heat_a == 0, heat_b == 0) {
-                (true, false) => std::cmp::Ordering::Less,
-                (false, true) => std::cmp::Ordering::Greater,
-                _ => match heat_a.cmp(&heat_b) {
-                    std::cmp::Ordering::Equal => {
-                        components[a].priority().cmp(&components[b].priority())
-                    }
-                    ord => ord,
-                },
-            }
-        });
-        let idx = candidates[0];
+        let idx = *candidates
+            .iter()
+            .min_by(|&&a, &&b| {
+                let heat_a = heatmap.get(a).copied().unwrap_or(0);
+                let heat_b = heatmap.get(b).copied().unwrap_or(0);
+                match (heat_a == 0, heat_b == 0) {
+                    (true, false) => std::cmp::Ordering::Less,
+                    (false, true) => std::cmp::Ordering::Greater,
+                    _ => match heat_a.cmp(&heat_b) {
+                        std::cmp::Ordering::Equal => {
+                            components[a].priority().cmp(&components[b].priority())
+                        }
+                        ord => ord,
+                    },
+                }
+            })
+            .unwrap();
         let new_level = levels[idx].degrade();
         total = total.saturating_sub(est(idx, levels[idx]));
         levels[idx] = new_level;
@@ -107,7 +109,7 @@ pub fn plan_tree(
             break;
         }
 
-        let mut candidates: Vec<usize> = (0..n)
+        let candidates: Vec<usize> = (0..n)
             .filter(|&i| levels[i] != RenderLevel::Detailed)
             .collect();
 
@@ -115,42 +117,37 @@ pub fn plan_tree(
             break;
         }
 
-        // 排序：pinned 组件优先升级，热组件次之
-        candidates.sort_by(|&a, &b| {
-            let pinned_a = components[a].is_pinned();
-            let pinned_b = components[b].is_pinned();
-            match (pinned_a, pinned_b) {
-                (true, false) => std::cmp::Ordering::Less,
-                (false, true) => std::cmp::Ordering::Greater,
-                _ => {
-                    let heat_a = heatmap.get(a).copied().unwrap_or(0);
-                    let heat_b = heatmap.get(b).copied().unwrap_or(0);
-                    match (heat_a == 0, heat_b == 0) {
-                        (true, false) => std::cmp::Ordering::Greater,
-                        (false, true) => std::cmp::Ordering::Less,
-                        _ => match heat_b.cmp(&heat_a) {
-                            std::cmp::Ordering::Equal => {
-                                components[b].priority().cmp(&components[a].priority())
-                            }
-                            ord => ord,
-                        },
-                    }
-                }
-            }
-        });
-
-        // 遍历已排序的候选，找到第一个实际成本在 slack 内的组件
+        // 线性扫描：找到 delta <= slack 的最佳候选
         let mut any_upgraded = false;
+        let mut best_idx = None;
+        let mut best_score: Option<(bool, u8, PriorityLevel)> = None;
         for &idx in &candidates {
             let new_level = levels[idx].upgrade();
             let delta = est(idx, new_level).saturating_sub(est(idx, levels[idx]));
             if delta <= slack {
-                total = total.saturating_sub(est(idx, levels[idx]));
-                levels[idx] = new_level;
-                total += est(idx, levels[idx]);
-                any_upgraded = true;
-                break;
+                let pinned = components[idx].is_pinned();
+                let heat = heatmap.get(idx).copied().unwrap_or(0);
+                let priority = components[idx].priority();
+                let score = (pinned, heat, priority);
+                let is_better = match &best_score {
+                    None => true,
+                    Some((bp, bh, bp_)) => {
+                        pinned > *bp
+                            || (!(*bp) && pinned == *bp && heat > *bh)
+                            || (pinned == *bp && heat == *bh && priority > *bp_)
+                    }
+                };
+                if is_better {
+                    best_score = Some(score);
+                    best_idx = Some(idx);
+                }
             }
+        }
+        if let Some(idx) = best_idx {
+            total = total.saturating_sub(est(idx, levels[idx]));
+            levels[idx] = levels[idx].upgrade();
+            total += est(idx, levels[idx]);
+            any_upgraded = true;
         }
         if !any_upgraded {
             break;

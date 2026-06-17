@@ -45,12 +45,6 @@ impl CuiDirectory {
             }
             CuiSource::Filesystem(root) => {
                 let mut components = Vec::new();
-                let builtin = CuiFileComponent::from_str(
-                    include_str!("../../../cui/_cui_introduction.cui"),
-                    "_cui_introduction",
-                )
-                .map_err(|e| format!("内置介绍组件解析失败: {e}"))?;
-                components.push(builtin);
                 if root.exists() {
                     visit_dir_inner(root, root, &mut components, &ScanStrategy::Single)?;
                 }
@@ -84,10 +78,6 @@ impl CuiDirectory {
                 }
             }
             CuiSource::Filesystem(root) => {
-                let builtin_yaml = include_str!("../../../cui/_cui_introduction.cui");
-                let builtin = CuiFileComponent::from_str(builtin_yaml, "_cui_introduction")?;
-                expanded.push(builtin);
-
                 if root.exists() {
                     visit_dir_inner(root, root, &mut expanded, &ScanStrategy::Multi)?;
                 }

@@ -24,7 +24,7 @@ use crate::component::{
     ComponentNode,
     builtin::{CuiFileLeaf, TextBlock, group},
 };
-use crate::context::Context;
+use crate::runtime::context::Context;
 use crate::data::DataMode;
 use crate::keyword::PriorityLevel;
 use crate::runtime::handler::{ActionHandler, HandlerRegistry};
@@ -52,7 +52,7 @@ impl Compiler {
     pub fn new() -> Self {
         Self {
             ctx: Context::new(),
-            include_intro: true,
+            include_intro: false,
             type_registry: builtin_registry(),
             dirs: Vec::new(),
             files: Vec::new(),
@@ -62,8 +62,15 @@ impl Compiler {
         }
     }
 
-    pub fn without_introduction(mut self) -> Self {
-        self.include_intro = false;
+    /// 显式加载 `_cui_introduction` 参考组件（框架说明文档）。
+    pub fn with_introduction(mut self) -> Self {
+        self.include_intro = true;
+        self
+    }
+
+    /// [已废弃] 原为关闭 introduction，现为默认行为。保留仅用于向后兼容。
+    #[deprecated = "introduction 默认关闭，请删除此调用或改用 with_introduction()"]
+    pub fn without_introduction(self) -> Self {
         self
     }
 

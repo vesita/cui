@@ -191,3 +191,52 @@ Cui::init()
 ```
 
 AI 通过 `component_action(component_id, action, params)` 与组件交互。
+
+## 十三、API 设计原则（进行中）
+
+### 当前问题
+
+部分 API 使用 `method_x_y()` 命名，未利用 Rust 的类型系统将相关操作分组：
+
+```rust
+// 当前 —— 平铺在 Context 上
+ctx.push_message(msg);
+ctx.read_messages();
+ctx.scroll_dialogue(pos);
+ctx.scroll_dialogue_by_cycles(n);
+ctx.expand_cold_zone(start, end);
+ctx.close_cold_zone();
+ctx.collect_persistable();
+ctx.last_render_stats();
+```
+
+### 目标模式
+
+将相关操作收敛到子访问器，通过类型系统组织：
+
+```rust
+// 目标 —— 按语义分组到子句柄
+ctx.dialogue_mut().push(msg);
+ctx.dialogue_mut().read();
+ctx.dialogue_mut().scroll(pos).cycles(n);
+ctx.dialogue_mut().expand_cold(start, end).close();
+
+ctx.persistence().collect();
+ctx.render().stats();
+```
+
+### 变更日志
+
+| 旧 API | 新 API |
+|--------|--------|
+| `ctx.push_message(msg)` | `ctx.dialogue_mut().push(msg)` |
+| `ctx.read_messages()` | `ctx.dialogue_mut().read()` |
+| `ctx.read_all_messages()` | `ctx.dialogue_mut().read_all()` |
+| `ctx.scroll_dialogue(pos)` | `ctx.dialogue_mut().scroll(pos)` |
+| `ctx.scroll_dialogue_by_cycles(n)` | `ctx.dialogue_mut().scroll_cycles(n)` |
+| `ctx.align_dialogue_to_turn_boundary()` | `ctx.dialogue_mut().align_turns()` |
+| `ctx.expand_cold_zone(s, e)` | `ctx.dialogue_mut().expand_cold(s, e)` |
+| `ctx.close_cold_zone()` | `ctx.dialogue_mut().close_cold()` |
+| `ctx.request_cold_zone()` | `ctx.dialogue_mut().request_cold()` |
+| `ctx.tick_cold_zone_countdown()` | `ctx.dialogue_mut().tick_cold()` |
+| `ctx.collect_persistable()` | `ctx.persistence().collect()` |

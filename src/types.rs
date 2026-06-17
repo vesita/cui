@@ -8,5 +8,3 @@ pub mod data;
 pub mod keyword;
 pub mod level;
 pub mod manage;
-pub mod output;
-pub mod tokenizer;

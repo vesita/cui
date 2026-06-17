@@ -65,7 +65,6 @@ fn main() {
 
 fn init_scene() -> cui::Context {
     Cui::init()
-        .without_introduction()
         .component(TextBlock::new("header", "工作流引擎", "功能: 阶段切换 + 预算控制 + 无副作用预览").build())
         .component(data_slot("status_slot", "运行时状态"))
         .component(

@@ -598,12 +598,12 @@ impl ComponentNode {
     /// 其余 kind 使用完整 `## [id] title` 块格式。
     pub fn render_node(&self, level: RenderLevel) -> String {
         let component = self.component_ref();
-        let body = component.render(level);
+        let body = self.render_body_only(level);
         let output = match component.kind() {
             ComponentKind::Action | ComponentKind::Inline => body,
             _ => {
                 let actions = self.actions(level);
-                crate::output::render_component(
+                crate::runtime::output::render_component(
                     component.id(),
                     component.title(),
                     level,
@@ -651,7 +651,7 @@ impl ComponentNode {
             if self.info().content_gen.get() == self.info().render_gen.get() {
                 match self.component_ref().kind() {
                     ComponentKind::Action | ComponentKind::Inline => String::new(),
-                    _ => crate::output::render_delta_marker(self.component_ref().id()),
+                    _ => crate::runtime::output::render_delta_marker(self.component_ref().id()),
                 }
             } else {
                 self.render_node(level)

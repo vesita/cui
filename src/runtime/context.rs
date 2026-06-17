@@ -12,7 +12,8 @@ use crate::component::{ComponentNode, ComponentTree};
 
 use crate::data::DataMode;
 use crate::manage::ManageEvent;
-use crate::render::{RenderStats, cycle::RenderCycle};
+use crate::runtime::cycle::RenderCycle;
+use crate::runtime::schedule::RenderStats;
 use crate::runtime::dialogue::DialogueManager;
 use crate::runtime::event::{ComponentEvent, EventBus, SimpleEventBus};
 use crate::runtime::handler::{ActionContext, ActionHandler, ActionHandlerRef, HandlerRegistry};
@@ -106,7 +107,7 @@ impl Context {
             extension: None,
             last_render_stats: None,
             tick: 0,
-            cycle: RenderCycle::Idle(crate::render::cycle::Idle {}),
+            cycle: RenderCycle::Idle(crate::runtime::cycle::Idle {}),
         }
     }
 
@@ -192,24 +193,24 @@ impl Context {
     ///
     /// prepare → render_plan → commit，推进 tick，清理过期 temp_expand。
     pub(crate) fn render_impl(&mut self, budget: usize) -> String {
-        use crate::render::cycle::RenderCycleMessages;
+        use crate::runtime::cycle::RenderCycleMessages;
         debug_assert!(
             self.cycle
-                .can_handle(&RenderCycleMessages::Prepare(crate::render::cycle::Prepare)),
+                .can_handle(&RenderCycleMessages::Prepare(crate::runtime::cycle::Prepare)),
             "render() 只能在 Idle 状态调用"
         );
-        self.cycle.on_prepare(crate::render::cycle::Prepare);
+        self.cycle.on_prepare(crate::runtime::cycle::Prepare);
 
         let plan = self.tree.prepare(budget, self.tick);
 
         debug_assert!(
             self.cycle.can_handle(&RenderCycleMessages::DoRenderPlan(
-                crate::render::cycle::DoRenderPlan
+                crate::runtime::cycle::DoRenderPlan
             )),
             "render_plan() 只能在 Preparing 状态调用"
         );
         self.cycle
-            .on_do_render_plan(crate::render::cycle::DoRenderPlan);
+            .on_do_render_plan(crate::runtime::cycle::DoRenderPlan);
 
         let output = self.tree.render_plan(&plan, None, self.tick);
         let stats = plan.stats();
@@ -217,11 +218,11 @@ impl Context {
 
         debug_assert!(
             self.cycle.can_handle(&RenderCycleMessages::CommitMsg(
-                crate::render::cycle::CommitMsg
+                crate::runtime::cycle::CommitMsg
             )),
             "commit() 只能在 Rendering 状态调用"
         );
-        self.cycle.on_commit_msg(crate::render::cycle::CommitMsg);
+        self.cycle.on_commit_msg(crate::runtime::cycle::CommitMsg);
 
         self.tree.commit();
         self.tick += 1;
@@ -240,7 +241,7 @@ impl Context {
     ///
     /// **会消费** recent actions，同一周期内重复调用会得到不同结果。
     pub(crate) fn render_volatile_impl(&mut self, budget: usize) -> String {
-        use crate::render::cycle::RenderCycleMessages;
+        use crate::runtime::cycle::RenderCycleMessages;
         // 保存状态
         let saved_triggered = self.tree.triggered_snapshot();
         let saved_conditions = self.tree.conditions_snapshot();
@@ -253,10 +254,10 @@ impl Context {
 
         debug_assert!(
             self.cycle
-                .can_handle(&RenderCycleMessages::Prepare(crate::render::cycle::Prepare)),
+                .can_handle(&RenderCycleMessages::Prepare(crate::runtime::cycle::Prepare)),
             "render_volatile() 只能在 Idle 状态调用"
         );
-        self.cycle.on_prepare(crate::render::cycle::Prepare);
+        self.cycle.on_prepare(crate::runtime::cycle::Prepare);
 
         let plan = self.tree.prepare(budget, self.tick);
         let output = self.tree.render_plan(&plan, None, self.tick);
@@ -264,9 +265,9 @@ impl Context {
         // 中止周期，不推进 tick
         if self
             .cycle
-            .can_handle(&RenderCycleMessages::Abort(crate::render::cycle::Abort))
+            .can_handle(&RenderCycleMessages::Abort(crate::runtime::cycle::Abort))
         {
-            self.cycle.on_abort(crate::render::cycle::Abort);
+            self.cycle.on_abort(crate::runtime::cycle::Abort);
         }
 
         // 恢复状态
@@ -328,20 +329,6 @@ impl Context {
     }
 
     /// 收集所有可持久化组件的渲染内容。
-    pub fn collect_persistable(&self) -> Vec<(String, Vec<String>)> {
-        let mut map: Vec<(String, Vec<String>)> = Vec::new();
-        for node in self.tree.iter() {
-            if let Some(key) = node.persist_key() {
-                let rendered = node.render_node(RenderLevel::Detailed);
-                if let Some(pos) = map.iter().position(|(k, _)| k == key) {
-                    map[pos].1.push(rendered);
-                } else {
-                    map.push((key.to_owned(), vec![rendered]));
-                }
-            }
-        }
-        map
-    }
 
     // ── 数据写入 ───────────────────────────────────────
 
@@ -387,79 +374,26 @@ impl Context {
         }
     }
 
-    /// 读取热窗对话消息（LLM 注入默认路径）。
-    pub fn read_messages(&self) -> Vec<String> {
-        self.dialogue.read_hot_messages()
+    /// 获取对话操作句柄。
+    ///
+    /// # 示例
+    ///
+    /// ```ignore
+    /// ctx.dialogue_mut().push(r#"{"role":"user","content":"hi"}"#);
+    /// let msgs: Vec<String> = ctx.dialogue_mut().read();
+    /// ctx.dialogue_mut().scroll(5);
+    /// ctx.dialogue_mut().expand_cold(0, 3);
+    /// ```
+    pub fn dialogue_mut(&mut self) -> DialogueHandle<'_> {
+        DialogueHandle { ctx: self }
     }
 
-    /// 读取全量对话消息（持久化/恢复用，非 LLM 路径）。
-    pub fn read_all_messages(&self) -> &[String] {
-        self.dialogue.read_all_messages()
+    pub fn dialogue(&self) -> DialogueRef<'_> {
+        DialogueRef { ctx: self }
     }
 
-    /// 推送 JSON 序列化的消息到对话。
-    pub fn push_message(&mut self, json: &str) {
-        self.dialogue.push_message(json, &mut self.tree);
-    }
-
-    // ── 对话操作 ───────────────────────────────────────
-
-    /// 滚动对话到指定位置。
-    pub fn scroll_dialogue(&mut self, position: i32) -> String {
-        self.dialogue
-            .with_dialogue(|ops| match ops.scroll_to(position) {
-                Some(msg) => format!(r#"{{"success":true,"message":"{}"}}"#, msg),
-                None => r#"{"error":"滚动失败"}"#.to_string(),
-            })
-            .unwrap_or_else(|| r#"{"error":"对话组件未注册"}"#.to_string())
-    }
-
-    /// 按轮次相对步数滚动对话。
-    pub fn scroll_dialogue_by_cycles(&mut self, step: i32) -> String {
-        self.dialogue
-            .with_dialogue(|ops| match ops.scroll_by_cycles(step) {
-                Some(msg) => format!(r#"{{"success":true,"message":"{}"}}"#, msg),
-                None => r#"{"error":"滚动失败"}"#.to_string(),
-            })
-            .unwrap_or_else(|| r#"{"error":"对话组件未注册"}"#.to_string())
-    }
-
-    /// 对齐到轮次边界。
-    pub fn align_dialogue_to_turn_boundary(&mut self) -> bool {
-        self.dialogue
-            .with_dialogue(|ops| ops.align_to_turn_boundary())
-            .unwrap_or(false)
-    }
-
-    /// 展开冷区域消息范围。
-    pub fn expand_cold_zone(&mut self, start: i32, end: i32) -> String {
-        self.dialogue
-            .with_dialogue(|ops| match ops.expand_cold_zone(start, end) {
-                Some(msg) => format!(r#"{{"success":true,"message":"{}"}}"#, msg),
-                None => r#"{"success":false,"message":"展开失败"}"#.to_string(),
-            })
-            .unwrap_or_else(|| r#"{"error":"对话组件未注册"}"#.to_string())
-    }
-
-    /// 关闭冷区域。
-    pub fn close_cold_zone(&mut self) -> bool {
-        self.dialogue
-            .with_dialogue(|ops| ops.close_cold_zone())
-            .unwrap_or(false)
-    }
-
-    /// 冷区域续期。
-    pub fn request_cold_zone(&mut self) -> bool {
-        self.dialogue
-            .with_dialogue(|ops| ops.request_cold_zone())
-            .unwrap_or(false)
-    }
-
-    /// 冷区域倒计时 tick。
-    pub fn tick_cold_zone_countdown(&mut self) -> bool {
-        self.dialogue
-            .with_dialogue(|ops| ops.tick_cold_zone_countdown())
-            .unwrap_or(false)
+    pub fn persistence(&self) -> PersistHandle<'_> {
+        PersistHandle { ctx: self }
     }
 
     // ── 动作 ───────────────────────────────────────────
@@ -492,7 +426,12 @@ impl Context {
                 params = merge_action_params(def.params(), request.params.as_deref());
                 if let Some(handler_ref) = def.handler() {
                     if let Some(handler) = self.resolve_handler_ref(handler_ref) {
-                        match handler.execute(&params, self as &mut dyn ActionContext) {
+                        let merged_params = params.clone();
+                        let merged_request = ActionRequest {
+                            params: Some(merged_params),
+                            ..request.clone()
+                        };
+                        match handler.execute_request(&merged_request, self as &mut dyn ActionContext) {
                             Ok(output) => {
                                 // 处理 ActionOutput.events
                                 for (event_name, event_data) in &output.events {
@@ -882,6 +821,18 @@ impl ConditionRender<'_> {
         self.ctx.tree_mut().restore_conditions(old);
         output
     }
+
+    /// 虚拟渲染（不推进 tick，不消费 recent actions）。
+    pub fn render_volatile(self) -> String {
+        let old = self.ctx.tree().conditions_snapshot();
+        self.ctx.tree_mut().clear_conditions();
+        for c in &self.conditions {
+            self.ctx.tree_mut().add_condition(c);
+        }
+        let output = self.ctx.render_volatile_impl(self.budget);
+        self.ctx.tree_mut().restore_conditions(old);
+        output
+    }
 }
 
 /// 预算渲染构建器，由 [`Context::with_budget`] 返回。
@@ -946,6 +897,129 @@ fn json_value_to_string(v: &serde_json::Value) -> String {
     match v {
         serde_json::Value::String(s) => s.clone(),
         other => other.to_string(),
+    }
+}
+
+// ── 对话操作句柄 ──────────────────────────────────
+
+// ── 对话读句柄 ────────────────────────────────────
+
+pub struct DialogueRef<'a> {
+    ctx: &'a Context,
+}
+
+impl<'a> DialogueRef<'a> {
+    pub fn read(&self) -> Vec<String> {
+        self.ctx.dialogue.read_hot_messages()
+    }
+    pub fn read_all(&self) -> &[String] {
+        self.ctx.dialogue.read_all_messages()
+    }
+}
+
+// ── 对话读写句柄 ──────────────────────────────────
+
+/// 对话操作句柄，将分散的 `push_message` / `read_messages` / `scroll_dialogue` 等
+/// 收敛到 `ctx.dialogue_mut()` 下。
+pub struct DialogueHandle<'a> {
+    ctx: &'a mut Context,
+}
+
+impl<'a> DialogueHandle<'a> {
+    /// 推送 JSON 序列化消息。
+    pub fn push(&mut self, json: &str) {
+        self.ctx.dialogue.push_message(json, &mut self.ctx.tree);
+    }
+
+    /// 读取热窗消息。
+    pub fn read(&self) -> Vec<String> {
+        self.ctx.dialogue.read_hot_messages()
+    }
+
+    /// 读取全量消息。
+    pub fn read_all(&self) -> &[String] {
+        self.ctx.dialogue.read_all_messages()
+    }
+
+    /// 滚动到指定位置。
+    pub fn scroll(&mut self, position: i32) -> String {
+        self.ctx.dialogue
+            .with_dialogue(|ops| match ops.scroll_to(position) {
+                Some(msg) => format!(r#"{{"success":true,"message":"{}"}}"#, msg),
+                None => r#"{"error":"滚动失败"}"#.to_string(),
+            })
+            .unwrap_or_else(|| r#"{"error":"对话组件未注册"}"#.to_string())
+    }
+
+    /// 按轮次滚动。
+    pub fn scroll_cycles(&mut self, step: i32) -> String {
+        self.ctx.dialogue
+            .with_dialogue(|ops| match ops.scroll_by_cycles(step) {
+                Some(msg) => format!(r#"{{"success":true,"message":"{}"}}"#, msg),
+                None => r#"{"error":"滚动失败"}"#.to_string(),
+            })
+            .unwrap_or_else(|| r#"{"error":"对话组件未注册"}"#.to_string())
+    }
+
+    /// 对齐到轮次边界。
+    pub fn align_turns(&mut self) -> bool {
+        self.ctx.dialogue
+            .with_dialogue(|ops| ops.align_to_turn_boundary())
+            .unwrap_or(false)
+    }
+
+    /// 展开冷区域。
+    pub fn expand_cold(&mut self, start: i32, end: i32) -> String {
+        self.ctx.dialogue
+            .with_dialogue(|ops| match ops.expand_cold_zone(start, end) {
+                Some(msg) => format!(r#"{{"success":true,"message":"{}"}}"#, msg),
+                None => r#"{"success":false,"message":"展开失败"}"#.to_string(),
+            })
+            .unwrap_or_else(|| r#"{"error":"对话组件未注册"}"#.to_string())
+    }
+
+    /// 关闭冷区域。
+    pub fn close_cold(&mut self) -> bool {
+        self.ctx.dialogue
+            .with_dialogue(|ops| ops.close_cold_zone())
+            .unwrap_or(false)
+    }
+
+    /// 请求冷区域。
+    pub fn request_cold(&mut self) -> bool {
+        self.ctx.dialogue
+            .with_dialogue(|ops| ops.request_cold_zone())
+            .unwrap_or(false)
+    }
+
+    /// 冷区域倒计时推进。
+    pub fn tick_cold(&mut self) -> bool {
+        self.ctx.dialogue
+            .with_dialogue(|ops| ops.tick_cold_zone_countdown())
+            .unwrap_or(false)
+    }
+}
+
+// ── 持久化句柄 ────────────────────────────────────
+
+pub struct PersistHandle<'a> {
+    ctx: &'a Context,
+}
+
+impl<'a> PersistHandle<'a> {
+    pub fn collect(&self) -> Vec<(String, Vec<String>)> {
+        let mut map: Vec<(String, Vec<String>)> = Vec::new();
+        for node in self.ctx.tree.iter() {
+            if let Some(key) = node.persist_key() {
+                let rendered = node.render_node(RenderLevel::Detailed);
+                if let Some(pos) = map.iter().position(|(k, _)| k == key) {
+                    map[pos].1.push(rendered);
+                } else {
+                    map.push((key.to_owned(), vec![rendered]));
+                }
+            }
+        }
+        map
     }
 }
 

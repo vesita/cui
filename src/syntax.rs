@@ -231,7 +231,7 @@ fn style_to_class(fg: syntect::highlighting::Color) -> &'static str {
 }
 
 /// HTML 转义。
-fn html_escape(s: &str) -> String {
+pub fn html_escape(s: &str) -> String {
     let mut out = String::with_capacity(s.len());
     for c in s.chars() {
         match c {

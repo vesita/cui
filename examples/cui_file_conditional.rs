@@ -11,7 +11,6 @@ use cui::Cui;
 
 fn main() {
     let mut ctx = Cui::init()
-        .without_introduction()
         .load_dir("examples/cui")
         .build();
 

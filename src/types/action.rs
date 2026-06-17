@@ -225,6 +225,28 @@ pub struct ActionRequest {
 }
 
 impl ActionRequest {
+    /// 创建无参数的动作请求。
+    pub fn new(component_id: impl Into<String>, action: impl Into<String>) -> Self {
+        Self {
+            component_id: component_id.into(),
+            action: action.into(),
+            params: None,
+        }
+    }
+
+    /// 创建带 JSON 参数的动作请求。
+    pub fn with_params(
+        component_id: impl Into<String>,
+        action: impl Into<String>,
+        params: impl Into<String>,
+    ) -> Self {
+        Self {
+            component_id: component_id.into(),
+            action: action.into(),
+            params: Some(params.into()),
+        }
+    }
+
     /// 解析整个 params 为指定类型 T。
     ///
     /// # 示例

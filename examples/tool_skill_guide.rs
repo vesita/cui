@@ -42,7 +42,6 @@ fn main() {
     handler_registry.register("tool.code_review", Arc::new(CodeReviewHandler));
 
     let mut ctx = Cui::init()
-        .without_introduction()
         .type_registry(type_registry)
         .tools("tools", "可用工具", PriorityLevel::High, (
             "examples/cui/tools/read_file.cui",

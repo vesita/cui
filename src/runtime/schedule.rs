@@ -169,20 +169,6 @@ pub(crate) fn apply_temp_expand_to_tree(node: &mut ComponentNode, te_id: &str) {
     }
 }
 
-/// 为 Composite 根节点计算子节点预算。
-///
-/// 若 Composite 设置了 `budget_ratio`，子预算按比例分配；
-/// 否则使用全部预算。
-pub(crate) fn composite_child_budget(total_budget: usize, root: &ComponentNode) -> usize {
-    if let ComponentNode::Composite {
-        budget_ratio: Some(ratio),
-        ..
-    } = root
-    {
-        return ((total_budget as f64 * *ratio as f64) as usize).max(1);
-    }
-    total_budget
-}
 
 /// 渲染统计 —— render 后的预算使用反馈。
 #[derive(Clone, Debug)]

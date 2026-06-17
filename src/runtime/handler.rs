@@ -13,18 +13,30 @@
 //! - `ActionHandlerRef::Inline(Arc<dyn ActionHandler>)` — Rust 代码直接注入
 //! - `ActionHandlerRef::Named(String)` — `.cui` 文件中按名称引用，运行时从注册表解析
 
+use crate::action::ActionRequest;
+use crate::component::ComponentNode;
 use crate::data::DataMode;
 use crate::level::RenderLevel;
 use std::sync::Arc;
 
 /// 动作处理器 —— 后端系统实现此 trait 以响应 CUI 动作。
 pub trait ActionHandler: Send + Sync {
-    /// 执行动作。`params` 为 JSON 字符串，`ctx` 为受限的框架访问接口。
+    /// 执行动作。`params` 为已合并 preset + request 的 JSON 字符串。
     fn execute(
         &self,
         params: &str,
         ctx: &mut dyn ActionContext,
     ) -> Result<ActionOutput, Box<dyn std::error::Error + Send + Sync>>;
+
+    /// 执行动作（类型化参数访问）。默认调用 `execute()`，覆写后可用
+    /// `request.param::<T>("key")` 直接解析参数，无需手动操作 JSON。
+    fn execute_request(
+        &self,
+        request: &ActionRequest,
+        ctx: &mut dyn ActionContext,
+    ) -> Result<ActionOutput, Box<dyn std::error::Error + Send + Sync>> {
+        self.execute(request.params.as_deref().unwrap_or("{}"), ctx)
+    }
 
     /// 参数 JSON Schema（可选，用于 AI 理解参数格式）。
     fn params_schema(&self) -> Option<String> {
@@ -123,7 +135,7 @@ impl HandlerRegistry {
     }
 
     /// 将注册表中的所有处理器注入到 Context 中。
-    pub fn apply_to(&self, ctx: &mut crate::context::Context) {
+    pub fn apply_to(&self, ctx: &mut crate::runtime::context::Context) {
         for (name, handler) in &self.handlers {
             ctx.register_handler(name.clone(), handler.clone());
         }
@@ -186,6 +198,9 @@ pub trait ActionContext {
     }
     /// 注册一个新的动作处理器。
     fn register_handler(&mut self, _name: &str, _handler: Arc<dyn ActionHandler>) {}
+
+    /// 动态注册新组件节点（handler 可在运行时创建组件）。
+    fn register(&mut self, _node: ComponentNode) {}
 }
 
 /// 动作执行结果。

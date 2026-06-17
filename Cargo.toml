@@ -1,6 +1,7 @@
 [workspace]
 members = [
     "crates/cui-derive",
+    "crates/cui-tokenizer",
     "crates/state-macro",
 ]
 resolver = "2"
@@ -24,6 +25,7 @@ tracing = "0.1.43"
 uuid = { version = "1.23.1", features = ["v4", "serde"] }
 state-macro = { path = "crates/state-macro" }
 cui-derive = { path = "crates/cui-derive" }
+cui-tokenizer = { path = "crates/cui-tokenizer" }
 
 [workspace.lints.clippy]
 all = { level = "warn", priority = -1 }
@@ -45,6 +47,7 @@ serde = { workspace = true, features = ["derive"] }
 serde_json = { workspace = true }
 serde_yaml = { workspace = true }
 cui-derive = { workspace = true }
+cui-tokenizer = { workspace = true }
 tracing = { workspace = true }
 ignore = { workspace = true, optional = true }
 dirs = { workspace = true, optional = true }

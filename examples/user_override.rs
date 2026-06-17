@@ -64,7 +64,6 @@ fn main() {
 
     // ── 基础渲染 ──
     let mut ctx = Cui::init()
-        .without_introduction()
         .load_dir(&base_dir)
         .build();
 
@@ -80,7 +79,6 @@ fn main() {
 
     // ── 带用户覆盖 ──
     let mut ctx2 = Cui::init()
-        .without_introduction()
         .load_dir(&base_dir)
         .user_overrides(&user_dir)
         .build();
@@ -94,7 +92,6 @@ fn main() {
     println!("低预算（无 pin 保护时 plan 被降级）");
     println!("══════════════════════════════════════════");
     let out = Cui::init()
-        .without_introduction()
         .load_dir(&base_dir)
         .build()
         .with_budget(50)
