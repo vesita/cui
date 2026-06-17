@@ -1,0 +1,15 @@
+---
+id: tool.code_review
+title: 代码审查
+type: tool.code_review
+handler: tool.code_review
+when: act
+priority: high
+---
+对指定范围的代码变更执行自动审查。
+
+**参数**:
+- `scope` (string): 审查范围，如 "HEAD~3..HEAD"
+- `rules` (string): 审查规则集，默认 "default"
+
+**返回**: 审查结果报告（问题列表、严重度、建议修复）

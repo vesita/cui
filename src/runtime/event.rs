@@ -64,7 +64,7 @@ impl ComponentEvent {
 }
 
 /// 事件总线 —— 组件间松耦合通信。
-pub trait EventBus {
+pub(crate) trait EventBus {
     /// 发布事件。
     fn emit(&mut self, event: ComponentEvent);
 
@@ -82,7 +82,7 @@ pub trait EventBus {
 /// 事件总线的简单实现。
 ///
 /// 订阅列表按注册顺序匹配，所有匹配的处理器均被调用。
-pub struct SimpleEventBus {
+pub(crate) struct SimpleEventBus {
     #[allow(clippy::type_complexity)]
     subscribers: Vec<(String, Box<dyn Fn(&ComponentEvent) + Send>)>,
 }

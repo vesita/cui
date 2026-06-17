@@ -123,6 +123,7 @@ pub struct NodeInfo {
     dyn_actions_gen: Cell<u64>,
     pub(crate) collapsible: bool,
     pub(crate) collapsed: bool,
+    pub(crate) pinned: bool,
 }
 
 /// 组件节点 —— 树的统一表示。
@@ -178,6 +179,7 @@ impl ComponentNode {
             dyn_actions_gen: Cell::new(0),
             collapsible: false,
             collapsed: true,
+            pinned: false,
         }
     }
 
@@ -298,6 +300,12 @@ impl ComponentNode {
     }
     pub fn set_collapsed(&mut self, v: bool) {
         self.info_mut().collapsed = v;
+    }
+    pub fn is_pinned(&self) -> bool {
+        self.info().pinned
+    }
+    pub(crate) fn set_pinned(&mut self, v: bool) {
+        self.info_mut().pinned = v;
     }
     pub fn visibility_condition(&self) -> VisibilityCondition {
         self.component_ref().visibility_condition()

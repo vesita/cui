@@ -1,0 +1,16 @@
+---
+id: tool.run_test
+title: 运行测试
+type: tool
+handler: tool.run_test
+when: act
+priority: high
+collapsible: true
+---
+运行项目测试套件，返回测试结果摘要。
+
+**参数**:
+- `filter` (string): 测试名称过滤，可选
+- `timeout` (integer): 超时秒数，默认 60
+
+**返回**: 通过/失败计数与失败详情

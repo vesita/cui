@@ -100,4 +100,16 @@ pub trait BaseComponent: Send {
     fn should_render(&self, _level: RenderLevel) -> bool {
         true
     }
+
+    /// 用户是否固定此组件（跳过预算降级，优先升级）。
+    /// 仅通过用户覆盖路径设置，开发者文件不可用。
+    fn is_pinned(&self) -> bool {
+        false
+    }
+
+    /// 用于内部 downcasting（仅框架内部使用）。
+    #[doc(hidden)]
+    fn as_any_mut(&mut self) -> &mut dyn std::any::Any {
+        panic!("as_any_mut not implemented for this component type")
+    }
 }

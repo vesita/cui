@@ -78,7 +78,13 @@ pub(crate) fn plan_composite_children(node: &mut ComponentNode, budget: usize) {
         let heatmap: Vec<u8> = children.iter().map(|c| c.heat()).collect();
         let minimums: Vec<RenderLevel> = children
             .iter()
-            .map(|c| crate::runtime::capacity::tier_minimum(c.priority()))
+            .map(|c| {
+                if c.is_pinned() {
+                    crate::runtime::capacity::PINNED_MINIMUM
+                } else {
+                    crate::runtime::capacity::tier_minimum(c.priority())
+                }
+            })
             .collect();
         let child_refs: Vec<&dyn crate::component::base::BaseComponent> =
             children.iter().map(|c| c.component_ref()).collect();

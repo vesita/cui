@@ -57,21 +57,20 @@ pub mod syntax;
 
 pub mod runtime;
 pub use runtime::registry::{
-    ComponentTypeDef, ResolvedComponent, TypeRegistry, builtin_registry,
+    ComponentTypeDef, TypeRegistry, builtin_registry,
 };
-pub use runtime::{capacity, dialogue, event, handler, ordering};
+pub use runtime::handler;
+pub use runtime::ordering;
 
 // ── 编译管道 ────────────────────────────────────────
 
 pub mod compile;
-pub use compile::compiler::{Compiler, CompilerError, build_tree_nodes};
-pub use compile::file::{CuiDirectory, CuiFileComponent, parse_frontmatter_body, parse_multi_cui};
-pub use compile::template::{ReadMode, TemplateEngine, TemplateNode, TemplateResolver};
+pub use compile::file::{CuiDirectory, CuiFileComponent};
+pub use compile::template::TemplateResolver;
 
 // ── 内容加载 ────────────────────────────────────────
 
 pub mod content;
-pub use content::bundled;
 
 #[cfg(feature = "instructions")]
 pub use content::instructions;
@@ -80,8 +79,6 @@ pub use content::instructions::{
     resolve_nearby_instructions, system_paths, system_prompt, system_prompt_and_sources,
     system_prompt_and_sources_with_cache,
 };
-#[cfg(feature = "prompts")]
-pub use content::prompt;
 
 // ── 适配器 ──────────────────────────────────────────
 
@@ -92,13 +89,11 @@ pub mod adapter;
 pub use action::{
     ActionDef, ActionRequest, ActionResult, ActionVariant, DialogueOps, VisibilityRule,
 };
-pub use compile::file as cui_file;
 pub use condition::VisibilityCondition;
 pub use data::DataMode;
 pub use handler::{ActionContext, ActionHandler, ActionHandlerRef, ActionOutput, HandlerRegistry};
 pub use keyword::{ComponentKind, IoDef, IoType, PriorityLevel};
 pub use level::RenderLevel;
-pub use manage::ManageEvent;
 pub use ordering::OrderingStrategy;
 
 // ── 测试工具模块（仅在 test 下编译） ───────────────
@@ -120,7 +115,7 @@ pub use runtime::test_utils;
 /// ```
 ///
 /// 若 fields 为空，仅返回 body（无 frontmatter）。
-pub fn format_cui_block(fields: &[(&str, &str)], body: &str) -> String {
+pub(crate) fn format_cui_block(fields: &[(&str, &str)], body: &str) -> String {
     if fields.is_empty() {
         return body.to_string();
     }

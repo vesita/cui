@@ -485,7 +485,13 @@ impl ComponentTree {
             let minimums: Vec<RenderLevel> = self
                 .roots
                 .iter()
-                .map(|r| crate::runtime::capacity::tier_minimum(r.priority()))
+                .map(|r| {
+                    if r.is_pinned() {
+                        crate::runtime::capacity::PINNED_MINIMUM
+                    } else {
+                        crate::runtime::capacity::tier_minimum(r.priority())
+                    }
+                })
                 .collect();
 
             let heatmap: Vec<u8> = self.roots.iter().map(|n| n.heat()).collect();

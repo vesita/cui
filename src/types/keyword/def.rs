@@ -382,6 +382,7 @@ static RESERVED_KEYWORDS: &[&str] = &[
     "aliases",
     "note",
     "env",
+    "pinned",
 ];
 
 // ── 源码位置 ───────────────────────────────────────────────────────

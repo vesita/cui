@@ -72,7 +72,7 @@ pub fn plan_tree(
         }
 
         let mut candidates: Vec<usize> = (0..n)
-            .filter(|&i| levels[i] != RenderLevel::Hidden)
+            .filter(|&i| levels[i] != RenderLevel::Hidden && !components[i].is_pinned())
             .collect();
 
         if candidates.is_empty() {
@@ -115,18 +115,27 @@ pub fn plan_tree(
             break;
         }
 
+        // 排序：pinned 组件优先升级，热组件次之
         candidates.sort_by(|&a, &b| {
-            let heat_a = heatmap.get(a).copied().unwrap_or(0);
-            let heat_b = heatmap.get(b).copied().unwrap_or(0);
-            match (heat_a == 0, heat_b == 0) {
-                (true, false) => std::cmp::Ordering::Greater,
-                (false, true) => std::cmp::Ordering::Less,
-                _ => match heat_b.cmp(&heat_a) {
-                    std::cmp::Ordering::Equal => {
-                        components[b].priority().cmp(&components[a].priority())
+            let pinned_a = components[a].is_pinned();
+            let pinned_b = components[b].is_pinned();
+            match (pinned_a, pinned_b) {
+                (true, false) => std::cmp::Ordering::Less,
+                (false, true) => std::cmp::Ordering::Greater,
+                _ => {
+                    let heat_a = heatmap.get(a).copied().unwrap_or(0);
+                    let heat_b = heatmap.get(b).copied().unwrap_or(0);
+                    match (heat_a == 0, heat_b == 0) {
+                        (true, false) => std::cmp::Ordering::Greater,
+                        (false, true) => std::cmp::Ordering::Less,
+                        _ => match heat_b.cmp(&heat_a) {
+                            std::cmp::Ordering::Equal => {
+                                components[b].priority().cmp(&components[a].priority())
+                            }
+                            ord => ord,
+                        },
                     }
-                    ord => ord,
-                },
+                }
             }
         });
 
@@ -163,17 +172,21 @@ pub fn plan_tree(
     }
 }
 
-/// 根据优先级返回保底渲染级别。
-///
-/// Critical/High 至少 Summary，Normal 至少 Title，
-/// Low/Minimal 默认 Hidden（预算充足时升级）。
-pub fn tier_minimum(priority: PriorityLevel) -> RenderLevel {
-    match priority {
-        PriorityLevel::Critical | PriorityLevel::High => RenderLevel::Summary,
-        PriorityLevel::Normal => RenderLevel::Title,
-        PriorityLevel::Low | PriorityLevel::Minimal => RenderLevel::Hidden,
+    /// 根据优先级返回保底渲染级别。
+    ///
+    /// Critical/High 至少 Summary，Normal 至少 Title，
+    /// Low/Minimal 默认 Hidden（预算充足时升级）。
+    /// 用户 pinned 组件始终保底 Standard。
+    pub fn tier_minimum(priority: PriorityLevel) -> RenderLevel {
+        match priority {
+            PriorityLevel::Critical | PriorityLevel::High => RenderLevel::Summary,
+            PriorityLevel::Normal => RenderLevel::Title,
+            PriorityLevel::Low | PriorityLevel::Minimal => RenderLevel::Hidden,
+        }
     }
-}
+
+    /// 用户固定组件的最小级别：永远不被降级到 Standard 以下。
+    pub const PINNED_MINIMUM: RenderLevel = RenderLevel::Standard;
 
 /// 优先级子预算权重（Composite 子节点分配用）。
 pub fn priority_weight(priority: PriorityLevel) -> usize {

@@ -41,39 +41,9 @@
 mod component;
 mod directory;
 mod frontmatter;
+mod user;
 
 pub use component::CuiFileComponent;
 pub(crate) use component::PROMPT_ESCDIR;
 pub use directory::CuiDirectory;
-pub use frontmatter::parse_frontmatter_body;
-
-/// 解析多个 CUI 块（以 `\n---\n` 分隔的多个 frontmatter + body 文档）。
-pub fn parse_multi_cui(content: &str) -> Vec<CuiFileComponent> {
-    let content = content.trim();
-    let rest = content
-        .strip_prefix("---\r\n")
-        .or_else(|| content.strip_prefix("---\n"))
-        .unwrap_or(content);
-
-    let parts: Vec<&str> = rest.split("\n---\n").collect();
-    let mut blocks = Vec::new();
-
-    for pair in parts.chunks(2) {
-        let fm = pair.first().map(|s| s.trim()).unwrap_or("");
-        let body = pair.get(1).map(|s| s.trim()).unwrap_or("");
-        if fm.is_empty() {
-            continue;
-        }
-        let full = format!("---\n{}\n---\n{}", fm, body);
-        match CuiFileComponent::from_str(&full, "__llm__") {
-            Ok(comp) => blocks.push(comp),
-            Err(e) => {
-                tracing::warn!(
-                    "parse_multi_cui: 跳过无法解析的块: {}",
-                    if e.len() > 120 { &e[..120] } else { &e }
-                );
-            }
-        }
-    }
-    blocks
-}
+pub(crate) use user::load_user_overrides;

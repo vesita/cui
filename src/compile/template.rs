@@ -28,7 +28,7 @@ pub enum ReadMode {
 
 /// 解析后的模板节点。
 #[derive(Debug, Clone, PartialEq)]
-pub enum TemplateNode {
+pub(crate) enum TemplateNode {
     /// 首部文本（第一个 component 之前），始终输出。
     Lead(String),
     /// 条件块：component 内容为空时整块不输出。
@@ -42,7 +42,7 @@ pub enum TemplateNode {
 
 /// 一个 `{{component id="..." mode=...}}` 指令。
 #[derive(Debug, Clone, PartialEq)]
-pub struct ComponentDirective {
+pub(crate) struct ComponentDirective {
     pub id: String,
     pub mode: ReadMode,
 }
@@ -54,10 +54,11 @@ pub trait TemplateResolver {
 }
 
 /// 模板引擎 —— 纯函数入口。
-pub struct TemplateEngine;
+pub(crate) struct TemplateEngine;
 
 impl TemplateEngine {
     /// 解析模板字符串为节点列表。
+#[cfg(test)]
     pub fn parse(template: &str) -> Vec<TemplateNode> {
         let mut nodes: Vec<TemplateNode> = Vec::new();
         let mut cursor = 0usize;
@@ -136,6 +137,7 @@ impl TemplateEngine {
     }
 
     /// 渲染解析后的节点列表。
+#[cfg(test)]
     pub fn render_nodes(nodes: &[TemplateNode], resolver: &dyn TemplateResolver) -> String {
         let mut out = String::new();
         for node in nodes {
@@ -161,6 +163,7 @@ impl TemplateEngine {
 
     /// 从 `prompt/escdir/views/{view_name}.cui` 加载模板并渲染。
     #[cfg(feature = "prompts")]
+#[cfg(test)]
     pub fn render_view(view_name: &str, resolver: &dyn TemplateResolver) -> String {
         let path = format!(
             "{}/views/{view_name}.cui",
@@ -211,6 +214,7 @@ impl TemplateEngine {
     }
 
     /// 解析 `label="xxx" mode=Truncated(200)` 指令体。
+#[cfg(test)]
     fn parse_directive(body: &str) -> Option<ComponentDirective> {
         let mut id: Option<String> = None;
         let mut mode = ReadMode::Full;
@@ -263,6 +267,7 @@ impl TemplateEngine {
 }
 
 /// 解析 mode 字符串为 ReadMode。
+#[cfg(test)]
 fn parse_mode(s: &str) -> ReadMode {
     let s = s.trim();
     if s.eq_ignore_ascii_case("Full") {

@@ -16,9 +16,9 @@ const INSTRUCTION_FILES: &[&str] = &[
 ];
 
 fn fmt_instruction_source(source: &str, content: &str) -> String {
-    crate::CuiFileComponent::from_file(crate::prompt_path!(
-        "escdir/system/instruction_source_prefix.cui"
-    ))
+    let prefix_path =
+        concat!(env!("CARGO_MANIFEST_DIR"), "/../../prompt/escdir/system/instruction_source_prefix.cui");
+    crate::CuiFileComponent::from_file(prefix_path)
     .map(|c| c.template(&[("source", source), ("content", content)]))
     .unwrap_or_default()
 }

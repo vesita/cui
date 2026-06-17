@@ -32,8 +32,9 @@ pub struct CuiFileLeaf {
     pub(crate) inputs: Vec<IoDef>,
     pub(crate) outputs: Vec<IoDef>,
     pub(crate) persist_key: Option<String>,
-    /// 层级类型的子类标签。如 `type: tool.bash` → subtype = "bash"。
     pub(crate) subtype: Option<String>,
+    pub(crate) title_override: Option<String>,
+    pub(crate) body_override: Option<String>,
 }
 
 impl CuiFileLeaf {
@@ -54,6 +55,8 @@ impl CuiFileLeaf {
             outputs: Vec::new(),
             persist_key: None,
             subtype: None,
+            title_override: None,
+            body_override: None,
         }
     }
 
@@ -113,12 +116,39 @@ impl CuiFileLeaf {
     }
 }
 
+/// 在已注册的叶节点上应用用户覆盖。
+pub(crate) fn leaf_apply_override(
+    node: &mut ComponentNode,
+    title: Option<&str>,
+    body: Option<&str>,
+    inputs: &[(String, String)],
+    pinned: bool,
+) {
+    if let ComponentNode::Leaf(info) = node {
+        if let Some(comp) = info.component.as_mut().as_any_mut().downcast_mut::<CuiFileLeaf>() {
+            if let Some(t) = title {
+                comp.title_override = Some(t.to_string());
+            }
+            if let Some(b) = body {
+                comp.body_override = Some(b.to_string());
+            }
+            for (name, val) in inputs {
+                comp.input_values.retain(|(k, _)| k != name);
+                comp.input_values.push((name.to_string(), val.to_string()));
+            }
+        }
+    }
+    if pinned {
+        node.set_pinned(true);
+    }
+}
+
 impl BaseComponent for CuiFileLeaf {
     fn id(&self) -> &str {
         &self.id
     }
     fn title(&self) -> &str {
-        &self.title
+        self.title_override.as_deref().unwrap_or(&self.title)
     }
     fn priority(&self) -> PriorityLevel {
         self.priority
@@ -159,13 +189,14 @@ impl BaseComponent for CuiFileLeaf {
                 crate::compile::template::TemplateEngine::fill_slots(&first_line, &refs)
             }),
             RenderLevel::Standard | RenderLevel::Detailed => {
+                let base_body = self.body_override.as_deref().unwrap_or(&self.body);
                 let refs: Vec<(&str, &str)> = self
                     .input_values
                     .iter()
                     .map(|(k, v)| (k.as_str(), v.as_str()))
                     .collect();
                 let body =
-                    crate::compile::template::TemplateEngine::fill_slots(&self.body, &refs);
+                    crate::compile::template::TemplateEngine::fill_slots(base_body, &refs);
                 let mut out = body;
                 if !self.data.is_empty() {
                     out.push('\n');
@@ -191,6 +222,10 @@ impl BaseComponent for CuiFileLeaf {
             }
             DataMode::Clear => self.data.clear(),
         }
+    }
+
+    fn as_any_mut(&mut self) -> &mut dyn std::any::Any {
+        self
     }
 }
 

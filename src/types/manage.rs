@@ -4,7 +4,7 @@
 
 /// 管理操作 —— 组件在收到事件时应执行的动作。
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
-pub enum ManageOp {
+pub(crate) enum ManageOp {
     /// 刷新数据（drain 后重建）。
     Refresh,
     /// 持久化当前状态。

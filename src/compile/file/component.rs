@@ -49,6 +49,7 @@ impl CuiFileComponent {
             when: _when,
             visibility: _visibility,
             budget_ratio,
+            ..
         } = fm;
         let actions: Vec<ActionDef> = fm_actions
             .into_iter()
@@ -97,6 +98,7 @@ impl CuiFileComponent {
             entry,
             visibility_cond,
             budget_ratio,
+            pinned: false,
         }
     }
 }
@@ -127,6 +129,7 @@ pub struct CuiFileComponent {
     entry: bool,
     visibility_cond: VisibilityCondition,
     budget_ratio: Option<f32>,
+    pinned: bool,
 }
 
 impl CuiFileComponent {
@@ -326,6 +329,37 @@ impl CuiFileComponent {
 
     pub fn budget_ratio(&self) -> Option<f32> {
         self.budget_ratio
+    }
+
+    // ── 用户覆盖用 mutator（pub(crate)） ───────────────────────
+
+    pub(crate) fn set_pinned(&mut self, v: bool) {
+        self.pinned = v;
+    }
+    pub(crate) fn set_title(&mut self, t: &str) {
+        self.title = t.to_string();
+    }
+    pub(crate) fn set_body(&mut self, b: &str) {
+        self.body = b.to_string();
+    }
+    pub(crate) fn set_summary(&mut self, s: &str) {
+        self.summary = Some(s.to_string());
+    }
+    pub(crate) fn set_priority(&mut self, p: PriorityLevel) {
+        self.priority = p;
+    }
+    pub(crate) fn set_input(&mut self, name: &str, value: &str) {
+        if let Some(existing) = self.inputs.iter_mut().find(|i| i.name == name) {
+            existing.default_value = Some(value.to_string());
+        } else {
+            self.inputs.push(crate::keyword::IoDef {
+                name: name.to_string(),
+                io_type: crate::keyword::IoType::String,
+                required: false,
+                description: None,
+                default_value: Some(value.to_string()),
+            });
+        }
     }
 
     pub fn render_to_string(&self, level: RenderLevel) -> String {

@@ -1,16 +1,7 @@
-//! # .cui 文件条件渲染指南
+//! # .cui 文件条件渲染
 //!
-//! `.cui` 文件的 `when:` 字段自动解析为 `VisibilityCondition::When`，
+//! 用 `load_dir()` 一次性加载整个目录的 `.cui` 文件。
 //! 配合 `in_condition()` + `with_budget()` 实现声明式阶段渲染。
-//!
-//! ```yaml
-//! ---
-//! id: plan
-//! title: 规划方案
-//! when: plan
-//! ---
-//! 规划内容...
-//! ```
 //!
 //! ```bash
 //! cargo run --example cui_file_conditional
@@ -21,12 +12,7 @@ use cui::Cui;
 fn main() {
     let mut ctx = Cui::init()
         .without_introduction()
-        .section("examples/cui/header.cui")
-        .section("examples/cui/plan.cui")
-        .section("examples/cui/act_bash.cui")
-        .section("examples/cui/act_files.cui")
-        .section("examples/cui/review.cui")
-        .section("examples/cui/status.cui")
+        .load_dir("examples/cui")
         .build();
 
     println!("══════════════════════════════════════════");

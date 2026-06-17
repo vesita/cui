@@ -22,5 +22,6 @@ pub use blocks::{
 };
 pub use group::{GroupBuilder, group};
 pub use leaf::{CuiFileLeaf, cui_file_leaf};
+pub(crate) use leaf::leaf_apply_override;
 pub use primitives::{Body, Button, DataSlot, Label, body, button, data_slot, label};
 pub use toast::{Toast, toast};

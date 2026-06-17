@@ -65,6 +65,9 @@ pub(super) struct CuiFrontmatter {
     pub(super) visibility: Option<String>,
     #[serde(default)]
     pub(super) budget_ratio: Option<f32>,
+    #[serde(default)]
+    #[allow(dead_code)]
+    pub(super) pinned: bool,
 }
 
 const fn default_priority() -> PriorityLevel {
@@ -140,7 +143,7 @@ pub(super) fn parse_visibility(raw: &str) -> VisibilityCondition {
 }
 
 /// 解析 YAML frontmatter + Markdown body。
-pub fn parse_frontmatter_body(content: &str) -> Result<(&str, &str), String> {
+pub(crate) fn parse_frontmatter_body(content: &str) -> Result<(&str, &str), String> {
     let content = content.trim();
     if !content.starts_with("---") {
         return Err("`.cui` 文件必须以 `---` 开头".into());

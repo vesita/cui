@@ -1,0 +1,15 @@
+---
+id: tool.read_file
+title: 读文件
+type: tool
+handler: tool.read_file
+when: act
+collapsible: true
+---
+读取指定路径的文件内容，支持多种编码格式。
+
+**参数**:
+- `path` (path): 文件路径，相对于工作目录
+- `encoding` (string): 编码格式，默认 utf-8
+
+**返回**: 文件内容字符串

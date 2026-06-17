@@ -11,18 +11,25 @@
 use crate::compile::file::CuiFileComponent;
 use crate::component::{
     ComponentNode,
-    builtin::{CuiFileLeaf, group},
+    builtin::CuiFileLeaf,
 };
+#[cfg(test)]
+use crate::component::builtin::group;
+use crate::runtime::registry::TypeRegistry;
+#[cfg(test)]
+use crate::runtime::registry::builtin_registry;
+#[cfg(test)]
 use crate::keyword::ComponentKind;
-use crate::runtime::registry::{TypeRegistry, builtin_registry};
+#[cfg(test)]
 use std::collections::HashMap;
+#[cfg(test)]
 use std::path::PathBuf;
 
 // ── 编译器错误 ──────────────────────────────────────────────────────
 
 /// 编译器错误类型。
 #[derive(Debug, Clone)]
-pub enum CompilerError {
+pub(crate) enum CompilerError {
     /// 引用的组件 ID 不存在。
     ReferenceNotFound { id: String, source_id: String },
     /// 重复的组件 ID。
@@ -95,7 +102,7 @@ impl std::fmt::Display for CompilerError {
 /// 多文档格式标准：至少 2 段 `---\nkey: value` 模式的前言块。
 /// 仅靠行首 `---` 计数会误判 body 中的水平线，因此额外验证
 /// `---` 后紧跟的行是否以 YAML key 开头。
-pub fn is_multi_document(content: &str) -> bool {
+pub(crate) fn is_multi_document(content: &str) -> bool {
     let lines: Vec<&str> = content.lines().collect();
     let mut doc_starts = 0u8;
     let mut i = 0usize;
@@ -137,7 +144,7 @@ fn is_yaml_key(line: &str) -> bool {
 ///
 /// 当 body 中出现单独的 `---` 行时（如 Markdown 水平线），
 /// 会向前检查下一行是否符合 YAML 键值对格式，只有符合时才将其视为文档分隔符。
-pub fn parse_multi_document(content: &str) -> Result<Vec<(String, String)>, CompilerError> {
+pub(crate) fn parse_multi_document(content: &str) -> Result<Vec<(String, String)>, CompilerError> {
     let content = content.trim();
     let lines: Vec<&str> = content.lines().collect();
     let mut docs = Vec::new();
@@ -201,7 +208,7 @@ pub fn parse_multi_document(content: &str) -> Result<Vec<(String, String)>, Comp
 }
 
 /// 展开多文档文件：将 `---` 分隔的多个文档解析为多个 `CuiFileComponent`。
-pub fn expand_multi_document(
+pub(crate) fn expand_multi_document(
     content: &str,
     file_id: &str,
 ) -> Result<Vec<CuiFileComponent>, String> {
@@ -243,7 +250,8 @@ fn extract_id_from_yaml(yaml: &str) -> Option<String> {
 // ── 引用解析 ──────────────────────────────────────────────────────
 
 /// 编译器：解析组件引用、检测循环、构建组件树。
-pub struct Compiler {
+#[cfg(test)]
+pub(crate) struct Compiler {
     /// 所有可用组件（ID → 组件）。
     components: HashMap<String, CuiFileComponent>,
     /// `source:` 引用解析的根目录。
@@ -252,6 +260,7 @@ pub struct Compiler {
     type_registry: TypeRegistry,
 }
 
+#[cfg(test)]
 impl Compiler {
     /// 从组件列表创建编译器，自动检测重复 ID。
     /// 默认使用内置类型注册表。
@@ -307,7 +316,8 @@ impl Compiler {
 /// 2. `kind: group` 或有 `children` 列表
 /// 3. id 为 `"main"` 的组件
 /// 4. 第一个组件
-pub fn build_tree_nodes(
+#[cfg(test)]
+pub(crate) fn build_tree_nodes(
     components: Vec<CuiFileComponent>,
 ) -> Result<ComponentNode, Vec<CompilerError>> {
     let entry_id = components
@@ -384,7 +394,87 @@ fn merge_input_values(comp: &CuiFileComponent, registry: &TypeRegistry) -> Vec<(
     merged.into_iter().collect()
 }
 
+/// 将单个 `.cui` 工具文件解析为完整的 `ComponentNode`。
+///
+/// 执行类型解析（通过 `TypeRegistry`）、动作合并、输入值填充。
+/// 用于 `CuiBuilder::tool()` 和 `adapter::tool_node()` 的统一入口。
+pub fn resolve_tool(comp: &CuiFileComponent, registry: &TypeRegistry) -> ComponentNode {
+    let type_name = comp.component_type();
+    let resolved = type_name
+        .and_then(|tn| {
+            registry
+                .resolve(
+                    tn,
+                    comp.id(),
+                    comp.title(),
+                    Some(comp.component_kind()),
+                    Some(comp.priority()),
+                    &comp.actions(),
+                    &comp.render_body(crate::level::RenderLevel::Standard),
+                    comp.summary(),
+                    Some(comp.is_inert()),
+                    Some(comp.is_static()),
+                    comp.handler(),
+                    comp.component_children(),
+                    comp.component_source(),
+                    comp.persist_key(),
+                    comp.is_entry(),
+                    comp.budget_ratio(),
+                )
+                .ok()
+        })
+        .unwrap_or_else(|| crate::runtime::registry::ResolvedComponent {
+            id: comp.id().to_string(),
+            title: comp.title().to_string(),
+            kind: comp.component_kind(),
+            priority: comp.priority(),
+            summary: comp.summary.clone(),
+            inert: comp.is_inert(),
+            is_static: comp.is_static(),
+            actions: comp.actions(),
+            body: comp.render_body(crate::level::RenderLevel::Standard),
+            children: comp.component_children().to_vec(),
+            source: comp.component_source().map(|s| s.to_string()),
+            persist: comp.persist_key().map(|s| s.to_string()),
+            entry: comp.is_entry(),
+            budget_ratio: comp.budget_ratio(),
+            subtype: None,
+        });
+
+    let mut leaf = CuiFileLeaf::new(&resolved.id, &resolved.title, &resolved.body)
+        .priority(resolved.priority)
+        .kind(resolved.kind)
+        .with_condition(comp.visibility_condition())
+        .with_inputs(comp.inputs().to_vec())
+        .with_outputs(comp.outputs().to_vec());
+    if resolved.inert {
+        leaf = leaf.inert();
+    }
+    if resolved.is_static {
+        leaf = leaf.is_static();
+    }
+    if let Some(ref s) = resolved.summary {
+        leaf = leaf.summary(s.as_str());
+    }
+    if let Some(ref pk) = resolved.persist {
+        leaf = leaf.persist(pk.as_str());
+    }
+    if let Some(ref st) = resolved.subtype {
+        leaf = leaf.subtype(st.as_str());
+    }
+    let input_pairs = merge_input_values(comp, registry);
+    let input_refs: Vec<(&str, &str)> = input_pairs
+        .iter()
+        .map(|(k, v)| (k.as_str(), v.as_str()))
+        .collect();
+    leaf = leaf.with_input_values(&input_refs);
+    let mut node = leaf.build();
+    node.set_actions(resolved.actions);
+    node
+}
+
 /// 递归收集 ComponentNode 树中所有组件 ID。
+#[cfg(test)]
 fn collect_node_ids(node: &ComponentNode) -> Vec<String> {
     let mut ids = vec![node.id().to_string()];
     if let ComponentNode::Composite { children, .. } = node {
@@ -395,6 +485,7 @@ fn collect_node_ids(node: &ComponentNode) -> Vec<String> {
     ids
 }
 
+#[cfg(test)]
 impl Compiler {
     /// 对组件进行类型解析，返回完整的 `ResolvedComponent`。
     /// 若组件未设置 `type:`，从实例字段构造等价结构。

@@ -9,8 +9,8 @@
 //! - [`ordering`] — 组件排序策略
 
 pub mod capacity;
-pub mod dialogue;
-pub mod event;
+pub(crate) mod dialogue;
+pub(crate) mod event;
 pub mod handler;
 pub mod ordering;
 pub mod registry;

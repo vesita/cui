@@ -16,7 +16,7 @@ use crate::component::ComponentTree;
 use crate::data::DataMode;
 
 /// 对话管理器 —— 管理消息缓冲和外部对话操作委托.
-pub struct DialogueManager {
+pub(crate) struct DialogueManager {
     messages: Vec<String>,
     shared: Option<Arc<Mutex<Box<dyn DialogueOps + Send>>>>,
 }
