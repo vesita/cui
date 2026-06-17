@@ -65,7 +65,7 @@ pub use runtime::ordering;
 // ── 编译管道 ────────────────────────────────────────
 
 pub mod compile;
-pub use compile::compiler::{Compiler, CompileError, ValidationWarning, compile_sources, ToolPaths, SkillEntries};
+pub use compile::compiler::{Compiler, CompileError, ValidationWarning, compile_sources, ToolPaths, SkillEntries, expand_multi_document, is_multi_document};
 pub use compile::file::{CuiDirectory, CuiFileComponent};
 pub use compile::template::TemplateResolver;
 

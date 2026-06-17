@@ -110,7 +110,7 @@ fn e2e_user_override_pin() {
     let ctx = Cui::init()
         .without_introduction()
         .load_dir(&base_dir)
-        .with_user_overrides_from(&user_dir)
+        .user_overrides(&user_dir)
         .build();
 
     let review = ctx.tree().find("review");

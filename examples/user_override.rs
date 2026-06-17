@@ -82,7 +82,7 @@ fn main() {
     let mut ctx2 = Cui::init()
         .without_introduction()
         .load_dir(&base_dir)
-        .with_user_overrides_from(&user_dir)
+        .user_overrides(&user_dir)
         .build();
 
     println!("\n══════════════════════════════════════════");

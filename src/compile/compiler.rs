@@ -77,16 +77,6 @@ impl Compiler {
         self
     }
 
-    pub fn section_with(mut self, path: &str, _f: impl FnOnce(&mut TextBlock)) -> Self {
-        self.files.push(path.to_string());
-        self
-    }
-
-    pub fn load_sections(mut self, paths: &[&str]) -> Self {
-        for p in paths { self.files.push(p.to_string()); }
-        self
-    }
-
     pub fn data(mut self, id: &str, value: &str) -> Self {
         self.ctx.write(id, DataMode::Append, value);
         self
@@ -122,7 +112,7 @@ impl Compiler {
         self
     }
 
-    pub fn with_user_overrides_from(mut self, dir: impl AsRef<std::path::Path>) -> Self {
+    pub fn user_overrides(mut self, dir: impl AsRef<std::path::Path>) -> Self {
         self.user_override_dir = Some(dir.as_ref().to_path_buf());
         self
     }
@@ -392,7 +382,7 @@ pub fn resolve_tool(comp: &CuiFileComponent, registry: &TypeRegistry) -> Compone
 
 // ── 多文档支持 ──────────────────────────────────────────────
 
-pub(crate) fn is_multi_document(content: &str) -> bool {
+pub fn is_multi_document(content: &str) -> bool {
     let lines: Vec<&str> = content.lines().collect();
     let mut doc_starts = 0u8;
     let mut i = 0;
@@ -444,7 +434,7 @@ fn parse_multi_document(content: &str) -> Result<Vec<(String, String)>, CompileE
     Ok(docs)
 }
 
-pub(crate) fn expand_multi_document(content: &str, file_id: &str) -> Result<Vec<CuiFileComponent>, String> {
+pub fn expand_multi_document(content: &str, file_id: &str) -> Result<Vec<CuiFileComponent>, String> {
     if !is_multi_document(content) { return Ok(vec![CuiFileComponent::from_str(content, file_id)?]); }
     let docs = parse_multi_document(content).map_err(|e| e.to_string())?;
     let mut components = Vec::new();
