@@ -44,6 +44,19 @@ pub enum OrderPosition {
     At(usize),
 }
 
+/// 缓存优化排序比较器（公开给 ComponentTree::reorder_roots 复用）。
+pub(crate) fn cache_optimized_cmp(a: &ComponentNode, b: &ComponentNode) -> std::cmp::Ordering {
+    a.volatility()
+        .cmp(&b.volatility())
+        .then_with(|| a.is_collapsible().cmp(&b.is_collapsible()))
+        .then_with(|| b.priority().cmp(&a.priority()))
+        .then_with(|| a.is_inert().cmp(&b.is_inert()))
+        .then_with(|| b.is_static().cmp(&a.is_static()))
+        .then_with(|| b.heat().cmp(&a.heat()))
+        .then_with(|| a.dirty_count().cmp(&b.dirty_count()))
+        .then_with(|| a.id().cmp(b.id()))
+}
+
 /// 按策略排序一组组件引用。
 ///
 /// 返回重排后的索引列表。不修改原切片。
@@ -62,47 +75,7 @@ pub(crate) fn sort_indices(nodes: &[&ComponentNode], strategy: OrderingStrategy)
             indices.sort_by(|&a, &b| nodes[a].id().cmp(nodes[b].id()));
         }
         OrderingStrategy::CacheOptimized => {
-            indices.sort_by(|&a, &b| {
-                // volatility: low first — 内容稳定的组件形成缓存前缀
-                let a_vol = nodes[a].volatility();
-                let b_vol = nodes[b].volatility();
-                a_vol
-                    .cmp(&b_vol)
-                    // is_collapsible: false first — 不可折叠组件是稳定结构骨架
-                    .then_with(|| {
-                        let a_foldable = nodes[a].is_collapsible();
-                        let b_foldable = nodes[b].is_collapsible();
-                        a_foldable.cmp(&b_foldable)
-                    })
-                    // priority: high first — 关键指令始终在前
-                    .then_with(|| nodes[b].priority().cmp(&nodes[a].priority()))
-                    // is_inert: false first — 惰性参考材料放到最后
-                    .then_with(|| {
-                        let a_inert = nodes[a].is_inert();
-                        let b_inert = nodes[b].is_inert();
-                        a_inert.cmp(&b_inert)
-                    })
-                    // is_static: true first
-                    .then_with(|| {
-                        let a_static = nodes[a].is_static();
-                        let b_static = nodes[b].is_static();
-                        b_static.cmp(&a_static)
-                    })
-                    // heat: high first — AI 刚交互过的紧随关键指令
-                    .then_with(|| {
-                        let a_heat = nodes[a].heat();
-                        let b_heat = nodes[b].heat();
-                        b_heat.cmp(&a_heat)
-                    })
-                    // dirty_count: low first
-                    .then_with(|| {
-                        let a_dc = nodes[a].dirty_count();
-                        let b_dc = nodes[b].dirty_count();
-                        a_dc.cmp(&b_dc)
-                    })
-                    // id: alphabetical
-                    .then_with(|| nodes[a].id().cmp(nodes[b].id()))
-            });
+            indices.sort_by(|&a, &b| cache_optimized_cmp(nodes[a], nodes[b]));
         }
     }
     indices

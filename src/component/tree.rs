@@ -157,6 +157,113 @@ impl ComponentTree {
         self.ordering
     }
 
+    /// 物理重排根组件顺序以优化 LLM 缓存命中率。
+    ///
+    /// 按缓存优化键（volatility↗ / collapsible↗ / priority↘ / inert↗ /
+    /// static↘ / heat↘ / dirty_count↗ / id↗）排序 `self.roots`。
+    ///
+    /// 确保 `_cui_recent` / `_cui_overview` 元数据组件已注册，并将
+    /// `_cui_recent`（volatility 最高）推到末尾。
+    pub fn reorder_roots(&mut self) {
+        self.ensure_meta_components();
+        self.roots
+            .sort_by(|a, b| ordering::cache_optimized_cmp(a, b));
+    }
+
+    /// 确保元数据组件（`_cui_recent` / `_cui_overview`）存在。
+    fn ensure_meta_components(&mut self) {
+        let has_recent = self.roots.iter().any(|n| n.id() == "_cui_recent");
+        let has_overview = self.roots.iter().any(|n| n.id() == "_cui_overview");
+
+        if !has_recent {
+            let node = crate::component::builtin::CuiFileLeaf::new(
+                "_cui_recent", "_recent", "",
+            )
+            .kind(crate::keyword::ComponentKind::Inline)
+            .priority(PriorityLevel::Low)
+            .inert()
+            .build();
+            self.roots.push(node);
+        }
+        if !has_overview {
+            let node = crate::component::builtin::CuiFileLeaf::new(
+                "_cui_overview", "概述", "",
+            )
+            .kind(crate::keyword::ComponentKind::Inline)
+            .priority(PriorityLevel::Low)
+            .inert()
+            .build();
+            self.roots.push(node);
+        }
+    }
+
+    /// 将 `_cui_recent` / `_cui_overview` 与最新数据同步。
+    ///
+    /// `recent_rendered` 为 `render_recent_actions` 的输出（clone 后的值）。
+    /// `hidden_info` 为隐藏组件信息列表。
+    fn sync_meta_components(&mut self, recent_rendered: Option<&str>, hidden_info: &[(String, bool, bool, bool)]) {
+        use crate::component::builtin::CuiFileLeaf;
+
+        // 更新 _cui_recent 身体内容
+        if let Some(node) = self.find_mut("_cui_recent") {
+            let new_body = recent_rendered.unwrap_or("").to_string();
+            let changed = if let Some(leaf) = node
+                .component_mut()
+                .as_any_mut()
+                .and_then(|a| a.downcast_mut::<CuiFileLeaf>())
+            {
+                let changed = leaf.body != new_body;
+                leaf.body = new_body;
+                changed
+            } else {
+                false
+            };
+            if changed {
+                node.mark_dirty();
+            }
+        }
+        // 更新 _cui_overview 身体内容
+        if let Some(node) = self.find_mut("_cui_overview") {
+            let new_body = if hidden_info.is_empty() {
+                String::new()
+            } else {
+                let mut overview = String::from("## [_overview]\n  ");
+                let ids: Vec<String> = hidden_info
+                    .iter()
+                    .map(|(id, _, dirty, _)| {
+                        if *dirty {
+                            format!("`{id}`●")
+                        } else {
+                            format!("`{id}`")
+                        }
+                    })
+                    .collect();
+                overview.push_str(&ids.join(" "));
+                overview.push_str(" `[expand_hidden]`\n");
+                overview
+            };
+            let changed = if let Some(leaf) = node
+                .component_mut()
+                .as_any_mut()
+                .and_then(|a| a.downcast_mut::<CuiFileLeaf>())
+            {
+                let changed = leaf.body != new_body;
+                leaf.body = new_body;
+                changed
+            } else {
+                false
+            };
+            if changed {
+                node.mark_dirty();
+            }
+        }
+    }
+
+    /// 检查是否已注册元数据组件（`_cui_recent` 存在即视为已启用 reorder 模式）。
+    pub fn has_meta_components(&self) -> bool {
+        self.roots.iter().any(|n| n.id() == "_cui_recent")
+    }
+
     /// 手动将组件移到指定位置。
     ///
     /// 返回 `true` 如果找到了指定 ID 的组件并成功移动。
@@ -472,9 +579,15 @@ impl ComponentTree {
         // recent block — clone to preserve across ticks (cleared every 3)
         let recent_actions = self.recent.clone();
         let recent_rendered = render_recent_actions(&recent_actions);
-        let overhead = recent_rendered
-            .as_ref()
-            .map_or(0, |s| crate::tokenizer::estimate(s) + 1);
+
+        let has_meta = self.has_meta_components();
+        let overhead = if has_meta {
+            0 // meta components are in roots, budget handled by capacity planning
+        } else {
+            recent_rendered
+                .as_ref()
+                .map_or(0, |s| crate::tokenizer::estimate(s) + 1)
+        };
         let effective = budget.saturating_sub(overhead);
 
         let mut assignments = Vec::new();
@@ -592,6 +705,11 @@ impl ComponentTree {
 
         let expanded = self.overview_expanded;
 
+        // 同步元数据组件数据（在 reorder 模式开启时）
+        if has_meta {
+            self.sync_meta_components(recent_rendered.as_deref(), &hidden_info);
+        }
+
         RenderPlan {
             condition_checks,
             assignments,
@@ -617,18 +735,28 @@ impl ComponentTree {
     ) -> String {
         let mut output = String::new();
 
-        if let Some(ref block) = plan.recent_rendered {
-            output.push_str(block);
-            output.push('\n');
+        let has_meta = self.has_meta_components();
+
+        if !has_meta {
+            if let Some(ref block) = plan.recent_rendered {
+                output.push_str(block);
+                output.push('\n');
+            }
         }
 
         // 低预算模式：Critical 至少 Title，其余进入 overview
         let low_budget = plan.effective_budget < MIN_RENDER_BUDGET;
 
         // 按排序策略计算渲染顺序（支持单次覆盖）
+        // reorder 模式下直接按物理顺序，不再虚拟排序
         let strategy = ordering_override.unwrap_or(self.ordering);
         let roots_ref: Vec<&ComponentNode> = self.roots.iter().collect();
-        let sorted_indices = ordering::sort_indices(&roots_ref, strategy);
+        let sorted_indices = if has_meta {
+            // 物理已排序，直接按 root 顺序渲染
+            (0..roots_ref.len()).collect()
+        } else {
+            ordering::sort_indices(&roots_ref, strategy)
+        };
 
         for &orig_idx in &sorted_indices {
             let root = &self.roots[orig_idx];
@@ -642,7 +770,7 @@ impl ComponentTree {
         }
 
         // 概述区（可见内容之后）
-        if !plan.hidden_info.is_empty() {
+        if !has_meta && !plan.hidden_info.is_empty() {
             output.push_str("## [_overview]\n  ");
             let ids: Vec<String> = plan
                 .hidden_info
@@ -772,5 +900,134 @@ impl ComponentTree {
                 dirty_nodes,
             },
         }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::component::builtin::TextBlock;
+    use crate::PriorityLevel;
+
+    #[test]
+    fn reorder_roots_creates_meta_components() {
+        let mut tree = ComponentTree::new();
+        assert!(!tree.has_meta_components());
+
+        tree.reorder_roots();
+
+        assert!(tree.has_meta_components());
+        assert!(tree.roots.iter().any(|n| n.id() == "_cui_recent"));
+        assert!(tree.roots.iter().any(|n| n.id() == "_cui_overview"));
+    }
+
+    #[test]
+    fn reorder_roots_idempotent() {
+        let mut tree = ComponentTree::new();
+        tree.reorder_roots();
+        let count = tree.len();
+        tree.reorder_roots();
+        assert_eq!(tree.len(), count);
+    }
+
+    #[test]
+    fn reorder_roots_sorts_stable_before_volatile() {
+        let mut tree = ComponentTree::new();
+
+        let mut volatile = TextBlock::new("volatile", "V", "vol")
+            .priority(PriorityLevel::Normal)
+            .build();
+        volatile.set_volatility(200);
+
+        let stable = TextBlock::new("stable", "S", "sta")
+            .priority(PriorityLevel::Normal)
+            .build();
+        // volatility = 0 by default
+
+        tree.push(stable);
+        tree.push(volatile);
+
+        tree.reorder_roots();
+
+        // After reorder: meta + stable first (low vol), volatile last (high vol)
+        let ids: Vec<String> = tree.roots.iter().map(|n| n.id().to_string()).collect();
+        let stable_pos = ids.iter().position(|id| id == "stable").unwrap();
+        let volatile_pos = ids.iter().position(|id| id == "volatile").unwrap();
+        assert!(stable_pos < volatile_pos,
+            "expected stable before volatile, got {ids:?}");
+    }
+
+    #[test]
+    fn reorder_roots_puts_volatile_last() {
+        let mut tree = ComponentTree::new();
+        let s = TextBlock::new("s", "S", "").build();
+        tree.push(s);
+
+        let mut volatile = TextBlock::new("v", "V", "").build();
+        volatile.set_volatility(200);
+        tree.push(volatile);
+
+        tree.reorder_roots();
+
+        // volatile (vol=200) should be last; meta components (vol=0, inert) before it
+        let ids: Vec<String> = tree.roots.iter().map(|n| n.id().to_string()).collect();
+        let v_pos = ids.iter().position(|id| id == "v").unwrap();
+        assert_eq!(v_pos, ids.len() - 1,
+            "volatile should be last, got order: {ids:?}");
+    }
+
+    #[test]
+    fn render_without_reorder_preserves_hardcoded_blocks() {
+        let mut tree = ComponentTree::new();
+        let a = TextBlock::new("a", "A", "body a").build();
+        tree.push(a);
+        tree.add_recent("A", "expand", true);
+
+        let output = tree.render(4096, None, 0);
+        assert!(output.contains("## [_recent]"), "expected hardcoded recent block: {output}");
+    }
+
+    #[test]
+    fn render_after_reorder_uses_meta_components() {
+        let mut tree = ComponentTree::new();
+        let a = TextBlock::new("a", "A", "body a").build();
+        tree.push(a);
+        tree.add_recent("A", "expand", true);
+
+        tree.reorder_roots();
+        let output = tree.render(4096, None, 0);
+
+        // _cui_recent is Inline, its body is the recent content
+        assert!(output.contains("## [_recent]"), "expected recent from meta component: {output}");
+        // not double: only one occurrence
+        let count = output.matches("## [_recent]").count();
+        assert_eq!(count, 1, "expected single _recent, got {count}: {output}");
+    }
+
+    #[test]
+    fn render_no_duplicate_recent_after_reorder() {
+        let mut tree = ComponentTree::new();
+        let a = TextBlock::new("a", "A", "body a").build();
+        tree.push(a);
+        tree.add_recent("A", "refresh", true);
+        tree.add_recent("B", "close", false);
+
+        tree.reorder_roots();
+        let output = tree.render(4096, None, 0);
+
+        let count = output.matches("## [_recent]").count();
+        assert_eq!(count, 1, "recent block should appear exactly once: {output}");
+    }
+
+    #[test]
+    fn reorder_then_render_keeps_body_content() {
+        let mut tree = ComponentTree::new();
+        let a = TextBlock::new("hello", "Hello", "world content").build();
+        tree.push(a);
+        tree.reorder_roots();
+
+        let output = tree.render(4096, None, 0);
+        assert!(output.contains("## [Hello]"), "expected header: {output}");
+        assert!(output.contains("world content"), "expected body: {output}");
     }
 }

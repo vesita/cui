@@ -162,6 +162,22 @@ impl Context {
         self.render_impl(DEFAULT_RENDER_BUDGET)
     }
 
+    /// 重排根组件顺序以优化 LLM prompt 缓存命中率。
+    ///
+    /// 渲染后调用：按 volatility、dirty_count 等信号物理排序 `roots`，
+    /// 稳定组件前移形成缓存前缀。同时注册 `_cui_recent` / `_cui_overview`
+    /// 元数据组件，后续渲染由组件树自动管理。
+    ///
+    /// 返回 `&mut Self` 支持链式调用：
+    /// ```ignore
+    /// ctx.render();
+    /// ctx.reorder().render();
+    /// ```
+    pub fn reorder(&mut self) -> &mut Self {
+        self.tree.reorder_roots();
+        self
+    }
+
     /// 虚拟渲染（不推进 tick，不清理状态），默认预算。
     pub fn render_volatile(&mut self) -> String {
         self.render_volatile_impl(DEFAULT_RENDER_BUDGET)

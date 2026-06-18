@@ -16,7 +16,7 @@
 use std::sync::Arc;
 use cui::action::ActionRequest;
 use cui::{ActionContext, ActionHandler, ActionOutput, HandlerRegistry};
-use cui::{Cui, DataMode, OrderingStrategy, PriorityLevel};
+use cui::{Cui, DataMode, PriorityLevel};
 
 fn main() {
     let mut handlers = HandlerRegistry::new();
@@ -79,10 +79,10 @@ fn main() {
             stats.budget, stats.component_count, stats.hidden_count);
     }
 
-    // ── 6. CacheOptimized 排序 ────────────────────
+    // ── 6. 缓存优化排序 ──────────────────────────
 
-    println!("\n══════ CacheOptimized 排序 ══════");
-    ctx.set_ordering(OrderingStrategy::CacheOptimized);
+    println!("\n══════ 缓存优化排序 (reorder) ══════");
+    ctx.reorder();
     let out = ctx.in_condition("plan").and("review").render();
     println!("{}", &out[..out.len().min(200)]);
     println!("  ... (共 {} 字符)", out.len());
