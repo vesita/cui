@@ -6,7 +6,7 @@
 //!
 //! 预算单位为 token（通过 [`crate::tokenizer`] 估算），非字符数。
 
-use crate::component::BaseComponent;
+use crate::component::CuiComponent;
 use crate::keyword::PriorityLevel;
 use crate::level::RenderLevel;
 
@@ -30,12 +30,12 @@ pub struct CapacityPlan {
     pub budget: usize,
 }
 
-/// 为 BaseComponent 进行容量规划。
+/// 为 CuiComponent 进行容量规划。
 ///
 /// `minimums` — 每个组件的保底级别（由优先级决定）。
 /// `heatmap` — 每个组件的热度值（0 = 冷，>0 = 最近交互过）。
 pub fn plan_tree(
-    components: &[&dyn BaseComponent],
+    components: &[&dyn CuiComponent],
     budget: usize,
     heatmap: &[u8],
     minimums: &[RenderLevel],
@@ -205,7 +205,7 @@ mod tests {
         size: usize, // chars produced at Standard
     }
 
-    impl BaseComponent for Dummy {
+    impl CuiComponent for Dummy {
         fn id(&self) -> &str {
             self.id
         }
@@ -242,7 +242,7 @@ mod tests {
             pri: crate::keyword::PriorityLevel::Minimal,
             size: 500,
         };
-        let components: Vec<&dyn BaseComponent> = vec![&high, &low];
+        let components: Vec<&dyn CuiComponent> = vec![&high, &low];
 
         // 500 chars * 2 / 4 = 250 tokens > budget 5 → 降级
         let minimums = vec![RenderLevel::Standard; 2];
@@ -263,7 +263,7 @@ mod tests {
             pri: crate::keyword::PriorityLevel::Minimal,
             size: 50,
         };
-        let components: Vec<&dyn BaseComponent> = vec![&high, &low];
+        let components: Vec<&dyn CuiComponent> = vec![&high, &low];
 
         // 50*2/4=25 tokens < budget 200 → 有空间升级
         let minimums = vec![RenderLevel::Standard; 2];
@@ -274,7 +274,7 @@ mod tests {
 
     #[test]
     fn empty_components() {
-        let components: Vec<&dyn BaseComponent> = vec![];
+        let components: Vec<&dyn CuiComponent> = vec![];
         let plan = plan_tree(&components, 1000, &[], &[]);
         assert!(plan.assignments.is_empty());
         assert_eq!(plan.total_estimated, 0);
@@ -292,7 +292,7 @@ mod tests {
             pri: crate::keyword::PriorityLevel::Low,
             size: 500,
         };
-        let components: Vec<&dyn BaseComponent> = vec![&a, &b];
+        let components: Vec<&dyn CuiComponent> = vec![&a, &b];
 
         let minimums = vec![RenderLevel::Standard; 2];
         let plan = plan_tree(&components, 1, &[], &minimums);
@@ -313,7 +313,7 @@ mod tests {
             pri: crate::keyword::PriorityLevel::Minimal,
             size: 500,
         };
-        let components: Vec<&dyn BaseComponent> = vec![&cold_high, &hot_low];
+        let components: Vec<&dyn CuiComponent> = vec![&cold_high, &hot_low];
 
         // 500 chars * 2 / 4 = 250 tokens > budget 100
         // 冷=0, 热=4 → 冷的先降级

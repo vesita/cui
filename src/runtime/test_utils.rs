@@ -13,7 +13,7 @@
 //! ```
 
 use crate::action::{ActionResult, ActionVariant, VisibilityRule};
-use crate::component::{BaseComponent, ComponentLifecycle, ComponentNode, Persistable};
+use crate::component::{CuiComponent, ComponentLifecycle, ComponentNode, Persistable};
 use crate::condition::VisibilityCondition;
 use crate::data::DataMode;
 use crate::keyword::PriorityLevel;
@@ -110,7 +110,7 @@ impl MockComponent {
     }
 }
 
-impl BaseComponent for MockComponent {
+impl CuiComponent for MockComponent {
     fn id(&self) -> &str {
         &self.id
     }
@@ -197,12 +197,12 @@ impl std::fmt::Debug for MockComponent {
 // ── 渲染辅助 ──────────────────────────────────────────────
 
 /// 渲染组件正文（等价于 `component.render(level)`）。
-pub fn render_to_string(comp: &dyn BaseComponent, level: RenderLevel) -> String {
+pub fn render_to_string(comp: &dyn CuiComponent, level: RenderLevel) -> String {
     comp.render(level)
 }
 
 /// 断言组件在指定级别的渲染输出与预期一致。
-pub fn assert_renders(comp: &dyn BaseComponent, level: RenderLevel, expected: &str) {
+pub fn assert_renders(comp: &dyn CuiComponent, level: RenderLevel, expected: &str) {
     assert_eq!(comp.render(level), expected);
 }
 

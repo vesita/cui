@@ -1,13 +1,27 @@
 //! CUI 框架 derive 宏。
 //!
-//! ## `#[derive(BaseComponent)]`
+//! ## `#[derive(CuiComponent)]`
 //!
-//! 为 CUI 组件生成 `BaseComponent` trait 样板代码。
+//! 为 CUI 组件生成 `CuiComponent` trait 样板代码。
 //!
 //! ```ignore
-//! #[derive(BaseComponent)]
-//! #[cui(id = "my_component", title = "我的组件", priority = "high")]
-//! struct MyComponent { ... }
+//! #[derive(CuiComponent)]
+//! #[cui(
+//!     id = "my_component",
+//!     title = "My Title",
+//!     priority = "high",
+//!     kind = "block",
+//!     write,
+//!     write_field = "data",
+//!     render_from = "data",
+//!     inert,
+//!     is_static,
+//!     visibility_field = "condition",
+//! )]
+//! struct MyComponent {
+//!     data: String,
+//!     condition: ::cui::VisibilityCondition,
+//! }
 //! ```
 //!
 //! ## `#[derive(ActionHandler)]`
@@ -36,6 +50,13 @@ struct CuiAttrs {
     id_expr: proc_macro2::TokenStream,
     title_expr: proc_macro2::TokenStream,
     priority: proc_macro2::TokenStream,
+    kind: Option<proc_macro2::TokenStream>,
+    write: bool,
+    write_field: proc_macro2::TokenStream,
+    inert: bool,
+    is_static: bool,
+    visibility_field: Option<proc_macro2::TokenStream>,
+    render_from: Option<proc_macro2::TokenStream>,
 }
 
 fn parse_priority(s: &str) -> proc_macro2::TokenStream {
@@ -49,11 +70,27 @@ fn parse_priority(s: &str) -> proc_macro2::TokenStream {
     }
 }
 
+fn parse_kind(s: &str) -> proc_macro2::TokenStream {
+    match s {
+        "block" => quote! { ::cui::ComponentKind::Block },
+        "inline" => quote! { ::cui::ComponentKind::Inline },
+        "action" => quote! { ::cui::ComponentKind::Action },
+        "group" => quote! { ::cui::ComponentKind::Group },
+        _ => quote! { ::cui::ComponentKind::Block },
+    }
+}
+
 fn parse_cui_attrs(input: &DeriveInput) -> syn::Result<CuiAttrs> {
-    // 默认：从 self.id / self.title 字段读取
     let mut id_expr: Option<proc_macro2::TokenStream> = None;
     let mut title_expr: Option<proc_macro2::TokenStream> = None;
     let mut priority: proc_macro2::TokenStream = quote! { ::cui::PriorityLevel::Normal };
+    let mut kind: Option<proc_macro2::TokenStream> = None;
+    let mut write_enabled = false;
+    let mut write_field: proc_macro2::TokenStream = quote! { content };
+    let mut inert = false;
+    let mut is_static = false;
+    let mut visibility_field: Option<proc_macro2::TokenStream> = None;
+    let mut render_from: Option<proc_macro2::TokenStream> = None;
 
     for attr in &input.attrs {
         if !attr.path().is_ident("cui") {
@@ -89,6 +126,35 @@ fn parse_cui_attrs(input: &DeriveInput) -> syn::Result<CuiAttrs> {
                 if let Lit::Str(s) = value {
                     priority = parse_priority(&s.value());
                 }
+            } else if meta.path.is_ident("kind") {
+                let value: Lit = meta.value()?.parse()?;
+                if let Lit::Str(s) = value {
+                    kind = Some(parse_kind(&s.value()));
+                }
+            } else if meta.path.is_ident("write") {
+                write_enabled = true;
+            } else if meta.path.is_ident("write_field") {
+                let value: Lit = meta.value()?.parse()?;
+                if let Lit::Str(s) = value {
+                    let field = syn::Ident::new(&s.value(), s.span());
+                    write_field = quote! { #field };
+                }
+            } else if meta.path.is_ident("inert") {
+                inert = true;
+            } else if meta.path.is_ident("is_static") {
+                is_static = true;
+            } else if meta.path.is_ident("visibility_field") {
+                let value: Lit = meta.value()?.parse()?;
+                if let Lit::Str(s) = value {
+                    let field = syn::Ident::new(&s.value(), s.span());
+                    visibility_field = Some(quote! { self.#field.clone() });
+                }
+            } else if meta.path.is_ident("render_from") {
+                let value: Lit = meta.value()?.parse()?;
+                if let Lit::Str(s) = value {
+                    let field = syn::Ident::new(&s.value(), s.span());
+                    render_from = Some(quote! { #field });
+                }
             }
             Ok(())
         })?;
@@ -101,10 +167,17 @@ fn parse_cui_attrs(input: &DeriveInput) -> syn::Result<CuiAttrs> {
         id_expr,
         title_expr,
         priority,
+        kind,
+        write: write_enabled,
+        write_field,
+        inert,
+        is_static,
+        visibility_field,
+        render_from,
     })
 }
 
-#[proc_macro_derive(BaseComponent, attributes(cui))]
+#[proc_macro_derive(CuiComponent, attributes(cui))]
 pub fn derive_base_component(input: TokenStream) -> TokenStream {
     let input = parse_macro_input!(input as DeriveInput);
     let attrs = match parse_cui_attrs(&input) {
@@ -117,19 +190,84 @@ pub fn derive_base_component(input: TokenStream) -> TokenStream {
     let title_expr = &attrs.title_expr;
     let priority = attrs.priority;
 
+    let kind_impl = attrs.kind.map(|k| {
+        quote! {
+            fn kind(&self) -> ::cui::ComponentKind { #k }
+        }
+    });
+
+    let write_impl = if attrs.write {
+        let wf = &attrs.write_field;
+        Some(quote! {
+            fn write(&mut self, mode: ::cui::DataMode, data: &str) {
+                match mode {
+                    ::cui::DataMode::Overwrite => self.#wf = data.to_string(),
+                    ::cui::DataMode::Append => { self.#wf.push_str(data); }
+                    ::cui::DataMode::Clear => self.#wf.clear(),
+                }
+            }
+        })
+    } else {
+        None
+    };
+
+    let inert_impl = if attrs.inert {
+        Some(quote! { fn is_inert(&self) -> bool { true } })
+    } else {
+        None
+    };
+
+    let static_impl = if attrs.is_static {
+        Some(quote! { fn is_static(&self) -> bool { true } })
+    } else {
+        None
+    };
+
+    let visibility_impl = attrs.visibility_field.map(|vf| {
+        quote! {
+            fn visibility_condition(&self) -> ::cui::VisibilityCondition { #vf }
+        }
+    });
+
+    let render_impl = if let Some(rf) = &attrs.render_from {
+        quote! {
+            fn render(&self, level: ::cui::RenderLevel) -> String {
+                match level {
+                    ::cui::RenderLevel::Hidden | ::cui::RenderLevel::Title => String::new(),
+                    ::cui::RenderLevel::Summary => {
+                        self.#rf.lines().next().map(|l| l.to_string()).unwrap_or_default()
+                    }
+                    ::cui::RenderLevel::Standard | ::cui::RenderLevel::Detailed => {
+                        self.#rf.clone()
+                    }
+                }
+            }
+        }
+    } else {
+        quote! {
+            fn render(&self, _level: ::cui::RenderLevel) -> String {
+                String::new()
+            }
+        }
+    };
+
     let expanded = quote! {
-        impl ::cui::BaseComponent for #name {
+        impl ::cui::CuiComponent for #name {
             fn id(&self) -> &str { #id_expr }
             fn title(&self) -> &str { #title_expr }
             fn priority(&self) -> ::cui::PriorityLevel { #priority }
 
-            fn render(&self, _level: ::cui::RenderLevel) -> String {
-                String::new()
-            }
+            #render_impl
 
             fn handle_action(&mut self, action: &str, _params: &str) -> ::cui::action::ActionResult {
                 ::cui::action::ActionResult::error(self.id(), action, "derive component has no actions")
             }
+
+            #kind_impl
+            #write_impl
+            #inert_impl
+            #static_impl
+            #visibility_impl
         }
     };
 

@@ -268,6 +268,25 @@ impl Context {
             .map(|n| (n.id().to_string(), n.level()))
             .collect();
 
+        // 保存 meta 组件的 body 和信号，prepare() 中的 sync_meta_components()
+        // 会修改这些数据，虚拟渲染后需恢复，避免污染下次真实渲染。
+        let saved_meta: Vec<(String, String, bool)> = {
+            use crate::component::builtin::CuiFileLeaf;
+            ["_cui_recent", "_cui_overview"]
+                .iter()
+                .filter_map(|mid| {
+                    let node = self.tree.find_mut(mid)?;
+                    let body = node
+                        .component_mut()
+                        .as_any_mut()
+                        .and_then(|a| a.downcast_mut::<CuiFileLeaf>())
+                        .map(|leaf| leaf.body.clone())?;
+                    let was_dirty = node.info().signal.interactive || node.info().signal.data_freshness > 0;
+                    Some((mid.to_string(), body, was_dirty))
+                })
+                .collect()
+        };
+
         debug_assert!(
             self.cycle
                 .can_handle(&RenderCycleMessages::Prepare(crate::runtime::cycle::Prepare)),
@@ -293,6 +312,27 @@ impl Context {
         for (id, level) in saved_levels {
             if let Some(node) = self.tree.find_mut(&id) {
                 node.set_level(level);
+            }
+        }
+
+        // 恢复 meta 组件的 body 和信号
+        for (mid, saved_body, was_dirty) in &saved_meta {
+            if let Some(node) = self.tree.find_mut(mid) {
+                use crate::component::builtin::CuiFileLeaf;
+                if let Some(leaf) = node
+                    .component_mut()
+                    .as_any_mut()
+                    .and_then(|a| a.downcast_mut::<CuiFileLeaf>())
+                {
+                    leaf.body = saved_body.clone();
+                }
+                if *was_dirty {
+                    node.info_mut().signal.interactive = true;
+                    node.info_mut().signal.data_freshness = 255;
+                } else {
+                    node.info_mut().signal.interactive = false;
+                    node.info_mut().signal.data_freshness = 0;
+                }
             }
         }
 
@@ -590,7 +630,9 @@ impl Context {
                 .with_message("已展开所有隐藏组件（单次有效，下轮自动折叠）");
         }
         if let Some(target_id) = action.strip_prefix("temp_expand:") {
-            // Toast 式临时展开：设置 3 tick 倒计时，同时转发到 expand 动作
+            if target_id.is_empty() {
+                return ActionResult::error("_overview", action, "temp_expand 缺少目标组件 ID");
+            }
             self.tree.set_temp_expand(target_id, 3, self.tick);
             let inner = ActionRequest {
                 component_id: target_id.to_string(),
@@ -600,6 +642,9 @@ impl Context {
             return self.component_action(&inner);
         }
         if let Some(target_id) = action.strip_prefix("expand_group:") {
+            if target_id.is_empty() {
+                return ActionResult::error("_overview", action, "expand_group 缺少目标组件 ID");
+            }
             let inner = ActionRequest {
                 component_id: target_id.to_string(),
                 action: "expand_group".to_string(),
@@ -608,6 +653,9 @@ impl Context {
             return self.component_action(&inner);
         }
         if let Some(target_id) = action.strip_prefix("expand:") {
+            if target_id.is_empty() {
+                return ActionResult::error("_overview", action, "expand 缺少目标组件 ID");
+            }
             let inner = ActionRequest {
                 component_id: target_id.to_string(),
                 action: "expand".to_string(),

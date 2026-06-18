@@ -34,15 +34,15 @@ pub(crate) fn render_recent_actions(actions: &[ActionRecord]) -> Option<String> 
 
 /// 递归衰减节点的活跃度信号。
 pub(crate) fn cool_node_signal(node: &mut ComponentNode) {
-    let current_hash = node.info().content_hash.get();
+    let current_gen = node.info().content_gen.get();
     let info = node.info_mut();
     info.signal.cool();
-    if current_hash != info.signal.last_content_hash {
+    if current_gen != info.signal.last_content_hash {
         info.signal.volatility = info.signal.volatility.saturating_add(32);
     } else {
         info.signal.volatility = info.signal.volatility.saturating_sub(4);
     }
-    info.signal.last_content_hash = current_hash;
+    info.signal.last_content_hash = current_gen;
     if let ComponentNode::Composite { children, .. } = node {
         for child in children.iter_mut() {
             cool_node_signal(child);
@@ -86,7 +86,7 @@ pub(crate) fn plan_composite_children(node: &mut ComponentNode, budget: usize) {
                 }
             })
             .collect();
-        let child_refs: Vec<&dyn crate::component::base::BaseComponent> =
+        let child_refs: Vec<&dyn crate::component::base::CuiComponent> =
             children.iter().map(|c| c.component_ref()).collect();
 
         let child_plan =

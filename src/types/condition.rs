@@ -8,7 +8,7 @@ use std::collections::HashSet;
 /// 组件可见性条件。
 ///
 /// 默认是 `Always`（始终可见）。需要条件渲染的组件覆盖
-/// `BaseComponent::visibility_condition()` 返回具体条件。
+/// `CuiComponent::visibility_condition()` 返回具体条件。
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub enum VisibilityCondition {
     /// 始终可见（默认）。

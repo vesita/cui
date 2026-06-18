@@ -1,4 +1,4 @@
-//! .cui 文件叶节点 —— 编译自 .cui 文件，直接实现 BaseComponent。
+//! .cui 文件叶节点 —— 编译自 .cui 文件，直接实现 CuiComponent。
 //!
 //! 渲染规则：
 //! - Hidden → ""
@@ -10,13 +10,13 @@
 
 use crate::PriorityLevel;
 use crate::action::ActionResult;
-use crate::component::{BaseComponent, ComponentNode, Persistable};
+use crate::component::{CuiComponent, ComponentNode, Persistable};
 use crate::condition::VisibilityCondition;
 use crate::data::DataMode;
 use crate::keyword::{ComponentKind, IoDef};
 use crate::level::RenderLevel;
 
-/// 由 .cui 文件编译得到的叶节点，跳过 adapter 直接实现 BaseComponent。
+/// 由 .cui 文件编译得到的叶节点，跳过 adapter 直接实现 CuiComponent。
 pub struct CuiFileLeaf {
     pub(crate) id: String,
     pub(crate) title: String,
@@ -143,7 +143,7 @@ pub(crate) fn leaf_apply_override(
     }
 }
 
-impl BaseComponent for CuiFileLeaf {
+impl CuiComponent for CuiFileLeaf {
     fn id(&self) -> &str {
         &self.id
     }
@@ -253,9 +253,9 @@ mod tests {
         let leaf = CuiFileLeaf::new("id1", "标题", "内容");
         assert_eq!(leaf.id(), "id1");
         assert_eq!(leaf.title(), "标题");
-        assert_eq!(BaseComponent::priority(&leaf), PriorityLevel::Normal);
+        assert_eq!(CuiComponent::priority(&leaf), PriorityLevel::Normal);
         assert!(!leaf.is_inert());
-        assert!(!BaseComponent::is_static(&leaf));
+        assert!(!CuiComponent::is_static(&leaf));
     }
 
     #[test]
@@ -266,9 +266,9 @@ mod tests {
             .inert()
             .is_static()
             .with_condition(VisibilityCondition::when("review"));
-        assert_eq!(BaseComponent::priority(&leaf), PriorityLevel::High);
+        assert_eq!(CuiComponent::priority(&leaf), PriorityLevel::High);
         assert!(leaf.is_inert());
-        assert!(BaseComponent::is_static(&leaf));
+        assert!(CuiComponent::is_static(&leaf));
     }
 
     #[test]

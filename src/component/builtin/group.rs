@@ -4,7 +4,7 @@
 
 use crate::PriorityLevel;
 use crate::action::{ActionResult, ActionVariant};
-use crate::component::{BaseComponent, ComponentNode};
+use crate::component::{CuiComponent, ComponentNode};
 use crate::condition::VisibilityCondition;
 use crate::level::RenderLevel;
 
@@ -107,7 +107,7 @@ pub(crate) struct GroupComponent {
     pub(crate) inert: bool,
 }
 
-impl BaseComponent for GroupComponent {
+impl CuiComponent for GroupComponent {
     fn id(&self) -> &str {
         &self.id
     }

@@ -11,7 +11,13 @@ use crate::keyword::PriorityLevel;
 
 /// 从 .cui 文件构建单个工具组件节点。
 pub fn tool_node(path: &str, registry: &TypeRegistry) -> Option<ComponentNode> {
-    let comp = CuiFileComponent::from_file(path).ok()?;
+    let comp = match CuiFileComponent::from_file(path) {
+        Ok(c) => c,
+        Err(e) => {
+            tracing::warn!("加载工具文件失败: {path}: {e}");
+            return None;
+        }
+    };
     let mut node = resolve_tool(&comp, registry);
     if comp.collapsible() {
         node.set_collapsible(true);

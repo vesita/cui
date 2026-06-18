@@ -64,12 +64,12 @@ pub fn builtin_registry() -> TypeRegistry {
                     RenderLevel::Summary,
                 )),
         ],
-        body_template: None,
+        body_template: Some("{{data}}".into()),
         inputs: vec![],
         default_priority: Some(crate::keyword::PriorityLevel::High),
         default_inert: false,
         default_static: false,
-        description: "信息分区组件 —— 无执行动作，仅展示内容".into(),
+        description: "信息分区组件 —— 无执行动作，仅展示内容。通过 write() 注入数据，body 中使用 {{data}} 占位符".into(),
     });
 
     reg

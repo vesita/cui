@@ -53,14 +53,16 @@ fn theme_set() -> &'static ThemeSet {
     TS.get_or_init(ThemeSet::load_defaults)
 }
 
-static CURRENT_THEME: OnceLock<&'static str> = OnceLock::new();
+static CURRENT_THEME: OnceLock<String> = OnceLock::new();
 
 fn current_theme_name() -> &'static str {
-    CURRENT_THEME.get().copied().unwrap_or("base16-ocean.dark")
+    CURRENT_THEME
+        .get()
+        .map(|s| s.as_str())
+        .unwrap_or("base16-ocean.dark")
 }
 
-fn current_theme() -> &'static Theme {
-    let name = current_theme_name();
+fn current_theme(name: &str) -> &'static Theme {
     theme_set().themes.get(name).unwrap_or_else(|| {
         theme_set()
             .themes
@@ -93,8 +95,7 @@ pub static THEMES: &[&str] = &[
 /// 主题名须为 [`THEMES`] 中的一项。不在列表中时静默忽略。
 pub fn set_theme(name: &str) {
     if theme_set().themes.contains_key(name) {
-        let leaked: &'static str = Box::leak(name.to_string().into_boxed_str());
-        let _ = CURRENT_THEME.set(leaked);
+        let _ = CURRENT_THEME.set(name.to_string());
     }
 }
 
@@ -103,7 +104,8 @@ pub fn set_theme(name: &str) {
 /// 若 `lang` 为空或不受支持，返回 HTML 转义后的纯文本（无高亮）。
 pub fn highlight_to_html(code: &str, lang: &str) -> String {
     let ss = syntax_set();
-    let theme = current_theme();
+    let theme_name = current_theme_name().to_string();
+    let theme = current_theme(&theme_name);
 
     match find_syntax(ss, lang) {
         Some(syn) => {
@@ -120,7 +122,8 @@ pub fn highlight_tokens(code: &str, lang: &str) -> Vec<Token> {
     use syntect::util::LinesWithEndings;
 
     let ss = syntax_set();
-    let theme = current_theme();
+    let theme_name = current_theme_name().to_string();
+    let theme = current_theme(&theme_name);
 
     let Some(syntax) = find_syntax(ss, lang) else {
         return vec![("hl-pl", code.to_string())];

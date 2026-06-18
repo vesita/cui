@@ -1,7 +1,7 @@
-//! 组件模型 —— BaseComponent 体系及组件树数据结构。
+//! 组件模型 —— CuiComponent 体系及组件树数据结构。
 //!
 //! ## 核心架构
-//! - **base** — BaseComponent、ComponentLifecycle、Persistable trait
+//! - **base** — CuiComponent、ComponentLifecycle、Persistable trait
 //! - **node** — ComponentSignal、NodeSchema、NodeInfo、ComponentNode
 //! - **tree** — ComponentTree 数据模型 + StateEntry
 //! - **iter** — AllNodes、AllNodesMut 全树迭代器
@@ -19,7 +19,7 @@ pub mod tree;
 #[cfg(test)]
 mod tests;
 
-pub use base::{BaseComponent, ComponentLifecycle, Persistable};
+pub use base::{CuiComponent, ComponentLifecycle, Persistable};
 pub use iter::{AllNodes, AllNodesMut};
 pub use node::{ComponentNode, ComponentSignal, NodeInfo, NodeSchema};
 pub use snapshot::{NodeSnapshot, TreeSnapshot, TreeStats};

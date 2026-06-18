@@ -1,7 +1,7 @@
 //! 内置组件库 —— 框架级组件，覆盖 80% 场景无需手写 trait。
 //!
 //! 类比 Flutter 的 Text/Container/ListView 等内置 Widget。
-//! 这些组件实现 [`BaseComponent`](crate::component::BaseComponent)，
+//! 这些组件实现 [`CuiComponent`](crate::component::CuiComponent)，
 //! 通过 `ComponentNode::leaf()` 即可使用。
 //!
 //! # 子模块

@@ -1,13 +1,13 @@
 //! 内置叶块组件 —— TextBlock、ConditionalBlock、ListBlock。
 //!
-//! 每个组件实现 [`BaseComponent`](crate::component::BaseComponent)，
+//! 每个组件实现 [`CuiComponent`](crate::component::CuiComponent)，
 //! 通过 `ComponentNode::leaf()` 即可使用。
 
 use std::fmt::Write;
 
 use crate::PriorityLevel;
 use crate::action::{ActionResult, ActionVariant};
-use crate::component::{BaseComponent, ComponentNode};
+use crate::component::{CuiComponent, ComponentNode};
 use crate::condition::VisibilityCondition;
 use crate::data::DataMode;
 use crate::level::RenderLevel;
@@ -89,7 +89,7 @@ impl TextBlock {
     }
 }
 
-impl BaseComponent for TextBlock {
+impl CuiComponent for TextBlock {
     fn id(&self) -> &str {
         &self.id
     }
@@ -193,7 +193,7 @@ impl ConditionalBlock {
     }
 }
 
-impl BaseComponent for ConditionalBlock {
+impl CuiComponent for ConditionalBlock {
     fn id(&self) -> &str {
         &self.id
     }
@@ -324,7 +324,7 @@ impl ListBlock {
     }
 }
 
-impl BaseComponent for ListBlock {
+impl CuiComponent for ListBlock {
     fn id(&self) -> &str {
         &self.id
     }
@@ -436,21 +436,21 @@ mod tests {
         let tb = TextBlock::new("t", "标题", "内容");
         assert_eq!(tb.id(), "t");
         assert_eq!(tb.title(), "标题");
-        assert_eq!(BaseComponent::priority(&tb), PriorityLevel::Normal);
+        assert_eq!(CuiComponent::priority(&tb), PriorityLevel::Normal);
         assert!(!tb.is_inert());
     }
 
     #[test]
     fn text_block_defaults() {
         let tb = TextBlock::new("t", "T", "C");
-        assert_eq!(BaseComponent::priority(&tb), PriorityLevel::Normal);
+        assert_eq!(CuiComponent::priority(&tb), PriorityLevel::Normal);
         assert!(!tb.is_inert());
     }
 
     #[test]
     fn text_block_priority() {
         let tb = TextBlock::new("t", "T", "C").priority(PriorityLevel::Critical);
-        assert_eq!(BaseComponent::priority(&tb), PriorityLevel::Critical);
+        assert_eq!(CuiComponent::priority(&tb), PriorityLevel::Critical);
     }
 
     #[test]
@@ -793,4 +793,5 @@ mod tests {
         assert!(rendered.contains("任务1"));
         assert!(rendered.contains("任务2"));
     }
+
 }

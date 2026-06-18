@@ -18,7 +18,7 @@ use serde::de::DeserializeOwned;
 
 /// 静态动作变体 —— 编译期定义，零动态分配。
 ///
-/// 组件通过 `BaseComponent::action_variants()` 返回 `&'static [ActionVariant]`，
+/// 组件通过 `CuiComponent::action_variants()` 返回 `&'static [ActionVariant]`，
 /// 框架自动构建 `ActionDef` 用于序列化，并驱动默认的 `handle_action`。
 ///
 /// ## 后端绑定

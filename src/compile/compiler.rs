@@ -219,21 +219,31 @@ pub fn compile_sources(
 
     for dir in dirs {
         let cui_dir = crate::compile::file::CuiDirectory::new(dir);
-        if let Ok(comps) = cui_dir.load_multi() {
-            for comp in comps {
-                let mut tb = TextBlock::new(comp.id(), comp.title(), comp.body());
-                tb = apply_meta(tb, &comp);
-                nodes.push(tb.build());
+        match cui_dir.load_multi() {
+            Ok(comps) => {
+                for comp in comps {
+                    let mut tb = TextBlock::new(comp.id(), comp.title(), comp.body());
+                    tb = apply_meta(tb, &comp);
+                    nodes.push(tb.build());
+                }
+            }
+            Err(e) => {
+                tracing::warn!("编译目录失败: {}: {}", dir.display(), e);
             }
         }
     }
 
     for path in files {
-        if let Ok(comps) = CuiFileComponent::from_file_multi(path) {
-            for comp in comps {
-                let mut tb = TextBlock::new(comp.id(), comp.title(), comp.body());
-                tb = apply_meta(tb, &comp);
-                nodes.push(tb.build());
+        match CuiFileComponent::from_file_multi(path) {
+            Ok(comps) => {
+                for comp in comps {
+                    let mut tb = TextBlock::new(comp.id(), comp.title(), comp.body());
+                    tb = apply_meta(tb, &comp);
+                    nodes.push(tb.build());
+                }
+            }
+            Err(e) => {
+                tracing::warn!("编译文件失败: {path}: {e}");
             }
         }
     }
@@ -323,7 +333,13 @@ fn apply_meta(tb: TextBlock, fm: &CuiFileComponent) -> TextBlock {
 }
 
 fn build_tool(path: &str, registry: &TypeRegistry) -> Option<ComponentNode> {
-    let comp = CuiFileComponent::from_file(path).ok()?;
+    let comp = match CuiFileComponent::from_file(path) {
+        Ok(c) => c,
+        Err(e) => {
+            tracing::warn!("编译工具失败: {path}: {e}");
+            return None;
+        }
+    };
     let mut node = resolve_tool(&comp, registry);
     if comp.collapsible() { node.set_collapsible(true); node.set_collapsed(comp.collapsed()); }
     Some(node)

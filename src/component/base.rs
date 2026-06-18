@@ -1,4 +1,4 @@
-//! 组件接口 —— BaseComponent、ComponentLifecycle、Persistable trait。
+//! 组件接口 —— CuiComponent、ComponentLifecycle、Persistable trait。
 
 use crate::action::{ActionResult, ActionVariant};
 use crate::condition::VisibilityCondition;
@@ -42,7 +42,7 @@ pub trait Persistable: Send {
 /// 基础组件接口 —— 所有组件必须实现的最小接口。
 ///
 /// 包含渲染和交互方法。生命周期和持久化方法已移至 [`ComponentLifecycle`] 和 [`Persistable`]。
-pub trait BaseComponent: Send {
+pub trait CuiComponent: Send {
     // ── 必需方法 ──
 
     fn id(&self) -> &str;

@@ -9,7 +9,7 @@ use crate::keyword::ComponentKind;
 use crate::level::RenderLevel;
 use crate::manage::ManageEvent;
 
-use super::base::{BaseComponent, ComponentLifecycle, Persistable};
+use super::base::{CuiComponent, ComponentLifecycle, Persistable};
 
 /// FNV-1a 哈希，用于内容变化检测。
 fn hash_str(s: &str) -> u64 {
@@ -86,7 +86,7 @@ impl ComponentSignal {
     }
 }
 
-/// 节点类型信息缓存 —— 构造时从 `BaseComponent` 复制，避免重复调用 trait 方法。
+/// 节点类型信息缓存 —— 构造时从 `CuiComponent` 复制，避免重复调用 trait 方法。
 #[derive(Debug, Clone)]
 pub struct NodeSchema {
     pub(crate) kind: ComponentKind,
@@ -108,7 +108,7 @@ impl NodeSchema {
 
 /// 组件节点的共享数据 —— 消除 Leaf/Composite 字段重复。
 pub struct NodeInfo {
-    pub(crate) component: Box<dyn BaseComponent>,
+    pub(crate) component: Box<dyn CuiComponent>,
     pub(crate) level: RenderLevel,
     pub(crate) signal: ComponentSignal,
     pub(crate) dynamic_actions: Vec<ActionDef>,
@@ -154,7 +154,7 @@ macro_rules! find_impl {
 
 impl ComponentNode {
     fn make_info(
-        component: Box<dyn BaseComponent>,
+        component: Box<dyn CuiComponent>,
         lifecycle: Option<Box<dyn ComponentLifecycle>>,
         persist: Option<Box<dyn Persistable>>,
     ) -> NodeInfo {
@@ -183,13 +183,13 @@ impl ComponentNode {
         }
     }
 
-    pub fn leaf(component: impl BaseComponent + 'static) -> Self {
+    pub fn leaf(component: impl CuiComponent + 'static) -> Self {
         let info = Self::make_info(Box::new(component), None, None);
         Self::Leaf(info)
     }
 
     pub fn leaf_with_lifecycle(
-        component: impl BaseComponent + 'static,
+        component: impl CuiComponent + 'static,
         lifecycle: impl ComponentLifecycle + 'static,
         persist: impl Persistable + 'static,
     ) -> Self {
@@ -201,7 +201,7 @@ impl ComponentNode {
     }
 
     pub fn composite(
-        component: impl BaseComponent + 'static,
+        component: impl CuiComponent + 'static,
         children: Vec<ComponentNode>,
     ) -> Self {
         Self::Composite {
@@ -227,11 +227,11 @@ impl ComponentNode {
         }
     }
 
-    pub(crate) fn component_ref(&self) -> &dyn BaseComponent {
+    pub(crate) fn component_ref(&self) -> &dyn CuiComponent {
         self.info().component.as_ref()
     }
 
-    pub(crate) fn component_mut(&mut self) -> &mut Box<dyn BaseComponent> {
+    pub(crate) fn component_mut(&mut self) -> &mut Box<dyn CuiComponent> {
         &mut self.info_mut().component
     }
 
@@ -259,7 +259,7 @@ impl ComponentNode {
         &mut self.info_mut().dynamic_actions
     }
 
-    /// 节点 schema（缓存自 BaseComponent 的 kind/input_schema/output_schema）。
+    /// 节点 schema（缓存自 CuiComponent 的 kind/input_schema/output_schema）。
     pub fn schema(&self) -> &NodeSchema {
         &self.info().schema
     }
@@ -506,7 +506,7 @@ impl ComponentNode {
 
     /// 组件自身 + 动态 action 回退：None = 两者都不认得。
     fn try_self_or_dynamic(
-        component: &mut Box<dyn BaseComponent>,
+        component: &mut Box<dyn CuiComponent>,
         level: &mut RenderLevel,
         signal: &mut ComponentSignal,
         dynamic_actions: &[ActionDef],
@@ -682,13 +682,13 @@ impl ComponentNode {
                     }
                 }
                 if !batched.is_empty() {
-                    out.push_str(&format!("Unchanged: {}\n", batched.join(", ")));
+                    out.push_str(&format!("_Unchanged:_ {}\n", batched.iter().map(|id| format!("`{id}`")).collect::<Vec<_>>().join(", ")));
                     batched.clear();
                 }
                 out.push_str(&child.render_recursive(child_level, delta));
             }
             if !batched.is_empty() {
-                out.push_str(&format!("Unchanged: {}\n", batched.join(", ")));
+                out.push_str(&format!("_Unchanged:_ {}\n", batched.iter().map(|id| format!("`{id}`")).collect::<Vec<_>>().join(", ")));
             }
         }
         out

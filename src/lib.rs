@@ -1,9 +1,9 @@
-//! CUI（Context UI）—— 基于 BaseComponent 的上下文 UI 框架。
+//! CUI（Context UI）—— 基于 CuiComponent 的上下文 UI 框架。
 //!
 //! 借鉴 Dioxus 组件模型，将组件渲染改造为
 //! 声明式、可交互的组件树。核心概念：
 //!
-//! - **BaseComponent** — 核心组件接口，有 id/title/priority/actions
+//! - **CuiComponent** — 核心组件接口，有 id/title/priority/actions
 //! - **RenderLevel** — 控制组件在不同容量压力下的展示粒度
 //! - **CapacityPlanner** — 迭代降级/升级算法，按优先级分配预算
 //! - **ComponentTree/ComponentNode** — 树形组件管理
@@ -15,7 +15,7 @@
 //! # 模块组织
 //!
 //! - [`types`] — 基础类型（RenderLevel、DataMode、Action 等）
-//! - [`component`] — BaseComponent/ComponentTree/ComponentNode 体系
+//! - [`component`] — CuiComponent/ComponentTree/ComponentNode 体系
 //! - [`render`] — 渲染管线（容量规划、状态机）
 //! - [`context`] — 运行时上下文管理器
 //! - [`compile`] — 编译管道：.cui 源码 → 模板填充 → 组件树
@@ -40,7 +40,7 @@ pub use component::builtin::{
     text_block, toast,
 };
 pub use component::{
-    BaseComponent, ComponentLifecycle, ComponentNode, ComponentTree, Persistable,
+    CuiComponent, ComponentLifecycle, ComponentNode, ComponentTree, Persistable,
     builtin,
 };
 
@@ -86,7 +86,7 @@ pub use action::{
     ActionDef, ActionRequest, ActionResult, ActionVariant, DialogueOps, VisibilityRule,
 };
 pub use condition::VisibilityCondition;
-pub use data::DataMode;
+pub use data::{DataMode, TruncatePolicy};
 pub use keyword::{ComponentKind, IoDef, IoType, PriorityLevel};
 pub use level::RenderLevel;
 pub use ordering::OrderingStrategy;
@@ -129,7 +129,7 @@ pub fn format_cui_block(fields: &[(&str, &str)], body: &str) -> String {
 
 // ── 宏导出 ──────────────────────────────────────────
 
-pub use cui_derive::{ActionHandler, BaseComponent};
+pub use cui_derive::{ActionHandler, CuiComponent};
 
 // ── 框架入口 ────────────────────────────────────────
 

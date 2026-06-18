@@ -7,7 +7,7 @@ use crate::keyword::PriorityLevel;
 use crate::level::RenderLevel;
 use crate::runtime::ordering::{self, OrderPosition, OrderingStrategy};
 
-use super::base::BaseComponent;
+use super::base::CuiComponent;
 use super::iter::{AllNodes, AllNodesMut};
 use super::node::ComponentNode;
 use super::snapshot::{NodeSnapshot, TreeSnapshot, TreeStats};
@@ -608,7 +608,7 @@ impl ComponentTree {
                 .collect();
 
             let heatmap: Vec<u8> = self.roots.iter().map(|n| n.heat()).collect();
-            let refs: Vec<&dyn BaseComponent> =
+            let refs: Vec<&dyn CuiComponent> =
                 self.roots.iter().map(|n| n.component_ref()).collect();
 
             let capacity_plan =

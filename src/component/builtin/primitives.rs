@@ -4,9 +4,9 @@
 
 use crate::ComponentKind;
 use crate::action::ActionResult;
-use crate::component::{BaseComponent, ComponentNode};
+use crate::component::{CuiComponent, ComponentNode};
 use crate::condition::VisibilityCondition;
-use crate::data::DataMode;
+use crate::data::{DataMode, TruncatePolicy};
 use crate::keyword::PriorityLevel;
 use crate::level::RenderLevel;
 
@@ -38,7 +38,7 @@ impl Label {
     }
 }
 
-impl BaseComponent for Label {
+impl CuiComponent for Label {
     fn id(&self) -> &str {
         &self.id
     }
@@ -90,7 +90,7 @@ impl Body {
     }
 }
 
-impl BaseComponent for Body {
+impl CuiComponent for Body {
     fn id(&self) -> &str {
         &self.id
     }
@@ -178,7 +178,7 @@ impl Button {
     }
 }
 
-impl BaseComponent for Button {
+impl CuiComponent for Button {
     fn id(&self) -> &str {
         &self.id
     }
@@ -220,6 +220,7 @@ pub fn button(id: &str, label: &str, command: &str) -> ComponentNode {
 /// 数据槽组件 —— 内联可写数据，替代 StateBlock。
 ///
 /// 通过 `write()` 接收外部数据，按级别渲染。
+/// 支持容量上限与截断策略。
 pub struct DataSlot {
     id: String,
     title: String,
@@ -227,6 +228,8 @@ pub struct DataSlot {
     priority: PriorityLevel,
     condition: VisibilityCondition,
     collapsible: bool,
+    max_chars: Option<usize>,
+    truncate: TruncatePolicy,
 }
 
 impl DataSlot {
@@ -238,6 +241,8 @@ impl DataSlot {
             priority: PriorityLevel::Normal,
             condition: VisibilityCondition::Always,
             collapsible: false,
+            max_chars: None,
+            truncate: TruncatePolicy::KeepTail,
         }
     }
 
@@ -256,15 +261,44 @@ impl DataSlot {
         self
     }
 
+    pub fn max_chars(mut self, limit: usize) -> Self {
+        self.max_chars = Some(limit);
+        self
+    }
+
+    pub fn truncate(mut self, policy: TruncatePolicy) -> Self {
+        self.truncate = policy;
+        self
+    }
+
     pub fn build(self) -> ComponentNode {
         let collapsible = self.collapsible;
         let mut node = ComponentNode::leaf(self);
         node.set_collapsible(collapsible);
         node
     }
+
+    fn apply_truncation(&mut self) {
+        let Some(limit) = self.max_chars else {
+            return;
+        };
+        let count = self.data.chars().count();
+        if count <= limit {
+            return;
+        }
+        match self.truncate {
+            TruncatePolicy::KeepTail => {
+                let skip = count - limit;
+                self.data = self.data.chars().skip(skip).collect();
+            }
+            TruncatePolicy::KeepHead => {
+                self.data = self.data.chars().take(limit).collect();
+            }
+        }
+    }
 }
 
-impl BaseComponent for DataSlot {
+impl CuiComponent for DataSlot {
     fn id(&self) -> &str {
         &self.id
     }
@@ -301,6 +335,7 @@ impl BaseComponent for DataSlot {
             }
             DataMode::Clear => self.data.clear(),
         }
+        self.apply_truncation();
     }
 }
 

@@ -1,5 +1,5 @@
 use crate::action::{ActionResult, ActionVariant};
-use crate::component::base::BaseComponent;
+use crate::component::base::CuiComponent;
 use crate::component::node::ComponentNode;
 use crate::data::DataMode;
 use crate::keyword::PriorityLevel;
@@ -28,7 +28,7 @@ impl Toast {
     }
 }
 
-impl BaseComponent for Toast {
+impl CuiComponent for Toast {
     fn id(&self) -> &str {
         &self.id
     }
