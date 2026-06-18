@@ -64,93 +64,93 @@ pub fn plan_tree(
         v
     };
 
-    // Phase 1: 降级
+    // Phase 1: 降级 —— 预排序单遍扫描，O(n log n)
     let mut total: usize = (0..n).map(|i| est(i, levels[i])).sum();
-    loop {
-        if total <= budget {
-            break;
-        }
 
-        let candidates: Vec<usize> = (0..n)
+    if total > budget {
+        let mut degrade_order: Vec<usize> = (0..n)
             .filter(|&i| levels[i] != RenderLevel::Hidden && !components[i].is_pinned())
             .collect();
-
-        if candidates.is_empty() {
-            break;
-        }
-
-        let idx = *candidates
-            .iter()
-            .min_by(|&&a, &&b| {
-                let heat_a = heatmap.get(a).copied().unwrap_or(0);
-                let heat_b = heatmap.get(b).copied().unwrap_or(0);
-                match (heat_a == 0, heat_b == 0) {
-                    (true, false) => std::cmp::Ordering::Less,
-                    (false, true) => std::cmp::Ordering::Greater,
-                    _ => match heat_a.cmp(&heat_b) {
-                        std::cmp::Ordering::Equal => {
-                            components[a].priority().cmp(&components[b].priority())
-                        }
-                        ord => ord,
-                    },
-                }
-            })
-            .unwrap();
-        let new_level = levels[idx].degrade();
-        total = total.saturating_sub(est(idx, levels[idx]));
-        levels[idx] = new_level;
-        total += est(idx, levels[idx]);
-    }
-
-    // Phase 2: 升级
-    loop {
-        let slack = budget.saturating_sub(total);
-        if slack == 0 {
-            break;
-        }
-
-        let candidates: Vec<usize> = (0..n)
-            .filter(|&i| levels[i] != RenderLevel::Detailed)
-            .collect();
-
-        if candidates.is_empty() {
-            break;
-        }
-
-        // 线性扫描：找到 delta <= slack 的最佳候选
-        let mut any_upgraded = false;
-        let mut best_idx = None;
-        let mut best_score: Option<(bool, u8, PriorityLevel)> = None;
-        for &idx in &candidates {
-            let new_level = levels[idx].upgrade();
-            let delta = est(idx, new_level).saturating_sub(est(idx, levels[idx]));
-            if delta <= slack {
-                let pinned = components[idx].is_pinned();
-                let heat = heatmap.get(idx).copied().unwrap_or(0);
-                let priority = components[idx].priority();
-                let score = (pinned, heat, priority);
-                let is_better = match &best_score {
-                    None => true,
-                    Some((bp, bh, bp_)) => {
-                        pinned > *bp
-                            || (!(*bp) && pinned == *bp && heat > *bh)
-                            || (pinned == *bp && heat == *bh && priority > *bp_)
+        degrade_order.sort_by(|&a, &b| {
+            let ha = heatmap.get(a).copied().unwrap_or(0);
+            let hb = heatmap.get(b).copied().unwrap_or(0);
+            match (ha == 0, hb == 0) {
+                (true, false) => std::cmp::Ordering::Less,
+                (false, true) => std::cmp::Ordering::Greater,
+                _ => match ha.cmp(&hb) {
+                    std::cmp::Ordering::Equal => {
+                        components[a].priority().cmp(&components[b].priority())
                     }
-                };
-                if is_better {
-                    best_score = Some(score);
-                    best_idx = Some(idx);
-                }
+                    ord => ord,
+                },
+            }
+        });
+
+        for &idx in &degrade_order {
+            if total <= budget {
+                break;
+            }
+            while total > budget && levels[idx] != RenderLevel::Hidden {
+                let new_level = levels[idx].degrade();
+                total = total.saturating_sub(est(idx, levels[idx]));
+                levels[idx] = new_level;
+                total += est(idx, levels[idx]);
             }
         }
-        if let Some(idx) = best_idx {
-            total = total.saturating_sub(est(idx, levels[idx]));
-            levels[idx] = levels[idx].upgrade();
-            total += est(idx, levels[idx]);
-            any_upgraded = true;
-        }
-        if !any_upgraded {
-            break;
+    }
+
+    // Phase 2: 升级 —— 预排序 + 循环扫描，O(n log n)
+    if total < budget {
+        let mut upgrade_order: Vec<usize> = (0..n)
+            .filter(|&i| levels[i] != RenderLevel::Detailed)
+            .collect();
+        upgrade_order.sort_by(|&a, &b| {
+            components[b]
+                .is_pinned()
+                .cmp(&components[a].is_pinned())
+                .then_with(|| {
+                    let ha = heatmap.get(a).copied().unwrap_or(0);
+                    let hb = heatmap.get(b).copied().unwrap_or(0);
+                    hb.cmp(&ha)
+                })
+                .then_with(|| components[b].priority().cmp(&components[a].priority()))
+        });
+
+        let n_upgrade = upgrade_order.len();
+        if n_upgrade > 0 {
+            let mut i = 0;
+            let mut passes_without_upgrade = 0;
+            loop {
+                let slack = budget.saturating_sub(total);
+                if slack == 0 {
+                    break;
+                }
+
+                let idx = upgrade_order[i % n_upgrade];
+                if levels[idx] == RenderLevel::Detailed {
+                    i += 1;
+                    passes_without_upgrade += 1;
+                    if passes_without_upgrade >= n_upgrade {
+                        break;
+                    }
+                    continue;
+                }
+
+                let new_level = levels[idx].upgrade();
+                let delta = est(idx, new_level).saturating_sub(est(idx, levels[idx]));
+                if delta <= slack {
+                    total = total.saturating_sub(est(idx, levels[idx]));
+                    levels[idx] = new_level;
+                    total += est(idx, levels[idx]);
+                    passes_without_upgrade = 0;
+                } else {
+                    i += 1;
+                    passes_without_upgrade += 1;
+                    if passes_without_upgrade >= n_upgrade {
+                        break;
+                    }
+                }
+            }
         }
     }
 

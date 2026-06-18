@@ -457,37 +457,47 @@ impl Context {
                                         self.emit("*", event_name, event_data);
                                     }
                                 }
-                                // 处理 new_level
+                                // 处理 new_level + 数据写入 + 渲染快照，单次 find_mut 合并操作
                                 let applied_level = output.new_level.or(def.target_level());
-                                if let (Some(new_level), Some(node_mut)) =
-                                    (applied_level, self.tree.find_mut(id))
-                                {
-                                    node_mut.set_level(new_level);
-                                }
-                                // 处理 handler 返回的数据
-                                if let Some(data) = &output.data {
-                                    self.tree.write(id, crate::data::DataMode::Overwrite, data);
-                                }
-                                // 标记 dirty 并渲染快照
-                                if let Some(node_mut) = self.tree.find_mut(id) {
-                                    node_mut.mark_dirty();
-                                    let snapshot = node_mut.render_node(node_mut.level());
-                                    // 发射生命周期事件
-                                    self.emit(
-                                        id,
-                                        "action_executed",
-                                        &format!(
-                                            r#"{{"action":"{action}","success":{}}}"#,
-                                            output.success
-                                        ),
-                                    );
-                                    let mut ar = ActionResult::new(id.clone(), action.to_string())
-                                        .with_snapshot(snapshot);
-                                    if let Some(lvl) = output.new_level {
-                                        ar = ar.with_new_level(lvl);
+                                let (snapshot, title) = {
+                                    if let Some(node_mut) = self.tree.find_mut(id) {
+                                        if let Some(new_level) = applied_level {
+                                            node_mut.set_level(new_level);
+                                        }
+                                        if let Some(data) = &output.data {
+                                            node_mut.write(
+                                                crate::data::DataMode::Overwrite,
+                                                data,
+                                            );
+                                        }
+                                        node_mut.mark_dirty();
+                                        let snap = node_mut.render_node(node_mut.level());
+                                        let t = node_mut.title().to_string();
+                                        (snap, t)
+                                    } else {
+                                        return ActionResult::error(
+                                            id,
+                                            action,
+                                            "组件已消失",
+                                        );
                                     }
-                                    return ar;
+                                };
+                                self.emit(
+                                    id,
+                                    "action_executed",
+                                    &format!(
+                                        r#"{{"action":"{action}","success":{}}}"#,
+                                        output.success
+                                    ),
+                                );
+                                self.tree.add_recent(&title, action, true);
+                                let mut ar =
+                                    ActionResult::new(id.clone(), action.to_string())
+                                        .with_snapshot(snapshot);
+                                if let Some(lvl) = applied_level {
+                                    ar = ar.with_new_level(lvl);
                                 }
+                                return ar;
                             }
                             Err(e) => {
                                 self.emit(
@@ -515,7 +525,7 @@ impl Context {
         } else {
             request.params.as_deref().unwrap_or("")
         };
-        let result = self
+        let (result, title) = self
             .tree
             .find_mut(id)
             .map(|node| {
@@ -523,9 +533,15 @@ impl Context {
                 if let Some(new_level) = r.new_level() {
                     node.set_level(new_level);
                 }
-                r
+                let t = node.title().to_string();
+                (r, t)
             })
-            .unwrap_or_else(|| ActionResult::error(id, action, format!("组件 '{id}' 未找到")));
+            .unwrap_or_else(|| {
+                (
+                    ActionResult::error(id, action, format!("组件 '{id}' 未找到")),
+                    id.to_string(),
+                )
+            });
 
         // "show" 动作自动触发 temp_expand，实现 Toast 式自动消失
         if result.is_success() && action == "show" {
@@ -534,11 +550,6 @@ impl Context {
 
         // 记录操作到 recent，帮助 AI 记住历史操作
         if result.is_success() {
-            let title = self
-                .tree
-                .find(id)
-                .map(|n| n.title().to_string())
-                .unwrap_or_else(|| id.to_string());
             self.tree.add_recent(&title, action, true);
         }
 
